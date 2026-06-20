@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Bell, Search, LogOut, Sun, Moon, User } from 'lucide-react';
+import { Bell, Search, LogOut, Sun, Moon, User, X, Check } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useThemeStore } from '@/store/theme.store';
 import { ROUTES } from '@/routes/routeMap';

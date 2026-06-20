@@ -67,6 +67,15 @@ export default function UserManagementPage() {
     }
   };
 
+  const activateUser = async (userId: string) => {
+    try {
+      await api.patch(`/admin/users/${userId}`, { active: true });
+      await fetchData();
+    } catch (error) {
+      alert('Failed to activate user.');
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
       {/* Header */}
@@ -146,9 +155,16 @@ export default function UserManagementPage() {
                   </div>
                 </td>
                 <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'right' }}>
-                  <button className="btn btn--icon" onClick={() => openEditModal(user)}>
-                    <Edit2 size={15} color="var(--accent-main)" />
-                  </button>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    {!user.active && (
+                      <button className="btn btn--secondary" onClick={() => activateUser(user.id)} style={{ whiteSpace: 'nowrap' }}>
+                        Accept
+                      </button>
+                    )}
+                    <button className="btn btn--icon" onClick={() => openEditModal(user)}>
+                      <Edit2 size={15} color="var(--accent-main)" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

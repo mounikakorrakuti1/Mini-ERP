@@ -8,6 +8,8 @@
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:users": "tsx prisma/seed-users.ts",
+    "db:seed:full": "tsx prisma/seed-full.ts",
     "demo:api": "tsx scripts/demo-api.ts",
     "demo:walkthrough": "tsx scripts/demo-walkthrough.ts",
     "format": "prettier . --write",
