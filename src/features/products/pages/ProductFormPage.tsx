@@ -1,13 +1,36 @@
-import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
-import { Package } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useDb } from '@/store/db.store';
+import { ProductForm } from '../components/ProductForm';
+import { ROUTES } from '@/routes/routeMap';
+import type { ProductFormData } from '../products.validation';
+import { ArrowLeft } from 'lucide-react';
 
 export default function ProductFormPage() {
+  const navigate = useNavigate();
+  const { addProduct } = useDb();
+
+  const handleSubmit = (data: ProductFormData) => {
+    addProduct(data);
+    navigate(ROUTES.PRODUCTS);
+  };
+
   return (
-    <PlaceholderPage
-      title="Create Product"
-      icon={Package}
-      moduleName="Products"
-      description="Add a new product to the catalog. Configure name, type, unit of measure, procurement settings, and reorder point thresholds."
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+      <div>
+        <button
+          className="btn btn--outline"
+          onClick={() => navigate(ROUTES.PRODUCTS)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-xs)' }}
+        >
+          <ArrowLeft size={16} />
+          <span>Back to Catalog</span>
+        </button>
+      </div>
+
+      <ProductForm
+        onSubmit={handleSubmit}
+        onCancel={() => navigate(ROUTES.PRODUCTS)}
+      />
+    </div>
   );
 }
