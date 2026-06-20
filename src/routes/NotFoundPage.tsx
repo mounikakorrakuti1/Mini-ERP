@@ -14,7 +14,7 @@ export function NotFoundPage() {
         <div className="text-sm" style={{ marginBottom: 'var(--space-lg)', color: 'var(--text-muted)' }}>
           The page you're looking for doesn't exist or has been moved.
         </div>
-        <Link to={ROUTES.DASHBOARD} className="btn btn--primary">
+        <Link to={ROUTES.DASHBOARD} className="btn btn--primary" title="Return to the main dashboard">
           <ArrowLeft size={16} /> Back to Dashboard
         </Link>
       </div>
