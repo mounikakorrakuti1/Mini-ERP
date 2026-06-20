@@ -1,10 +1,13 @@
 import { useNavigate } from 'react-router-dom';
-import { Bell, Search, LogOut, Sun, Moon } from 'lucide-react';
+import { Bell, Search, LogOut, Sun, Moon, Menu } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useThemeStore } from '@/store/theme.store';
 import { ROUTES } from '@/routes/routeMap';
 
-export function Topbar() {
+interface TopbarProps {
+}
+
+export function Topbar({}: TopbarProps) {
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const navigate = useNavigate();
@@ -15,15 +18,15 @@ export function Topbar() {
   };
 
   return (
-    <header className="topbar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-        <div className="input-field" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', minWidth: '300px' }}>
-          <Search size={16} color="var(--text-muted)" />
-          <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Search... (Cmd+K)</span>
-        </div>
+    <div className="topbar">
+      <div className="search">
+        <label>
+          <input type="text" placeholder="Search here" />
+          <Search className="lucide" size={18} />
+        </label>
       </div>
 
-      <div className="topbar__actions">
+      <div className="topbar__actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
         {/* Theme Toggle */}
         <button className="btn btn--icon" onClick={toggleTheme} title="Toggle Theme">
           {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
@@ -35,16 +38,15 @@ export function Topbar() {
         </button>
 
         <div className="topbar__user">
-          <div style={{ textAlign: 'right' }}>
-            <div className="text-md">{user?.name ?? 'Guest'}</div>
-            <div className="text-xs">{user?.role?.replace(/_/g, ' ') ?? 'No Role'}</div>
+          <div className="user">
+            <img src="https://ui-avatars.com/api/?name=Admin&background=2a2185&color=fff" alt="User" />
           </div>
-          
-          <button className="btn btn--icon" onClick={handleLogout} title="Logout" style={{ color: 'var(--status-danger)' }}>
-            <LogOut size={20} />
-          </button>
         </div>
+
+        <button className="btn btn--icon" onClick={handleLogout} title="Logout" style={{ color: 'var(--status-danger)' }}>
+          <LogOut size={20} />
+        </button>
       </div>
-    </header>
+    </div>
   );
 }

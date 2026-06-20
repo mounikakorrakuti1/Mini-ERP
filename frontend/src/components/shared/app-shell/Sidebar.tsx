@@ -49,20 +49,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   );
 
   return (
-    <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : 'sidebar--expanded'}`}>
-      <div className="sidebar__header" style={{ justifyContent: collapsed ? 'center' : 'flex-start' }}>
-        <div className="sidebar__header-logo">
-          <Factory size={20} />
-        </div>
-        {!collapsed && (
-          <div className="sidebar__header-text">
-            <div className="h3" style={{ lineHeight: 1 }}>Mini ERP</div>
-            <div className="text-xs">Shiv Furniture Works</div>
-          </div>
-        )}
-      </div>
+    <aside className={`navigation ${collapsed ? 'active' : ''}`}>
+      <ul>
+        {/* Brand/Logo Item */}
+        <li style={{ cursor: 'pointer' }} onClick={onToggle}>
+          <a href="#" onClick={(e) => e.preventDefault()}>
+            <span className="icon">
+              <Factory size={28} />
+            </span>
+            <span className="title" style={{ fontWeight: 700, fontSize: '1.2rem' }}>Mini ERP</span>
+          </a>
+        </li>
 
-      <nav className="sidebar__nav">
         {filteredItems.map((item) => (
           <SidebarNavItem
             key={item.path}
@@ -72,18 +70,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             collapsed={collapsed}
           />
         ))}
-      </nav>
-
-      <div className="sidebar__toggle-section">
-        <button onClick={onToggle} className="btn w-full" style={{ width: '100%' }}>
-          {collapsed ? <ChevronsRight size={20} /> : (
-            <>
-              <ChevronsLeft size={20} />
-              <span>Collapse</span>
-            </>
-          )}
-        </button>
-      </div>
+      </ul>
     </aside>
   );
 }

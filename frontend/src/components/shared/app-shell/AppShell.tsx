@@ -11,14 +11,14 @@ export function AppShell({ children }: AppShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="app-shell">
+    <div className="container">
       <Sidebar 
         collapsed={sidebarCollapsed} 
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
       />
-      <div className="app-shell__main">
+      <div className={`main ${sidebarCollapsed ? 'active' : ''}`}>
         <Topbar />
-        <main className="app-shell__content">
+        <main style={{ padding: '20px' }}>
           <Breadcrumbs />
           {children}
         </main>

@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 
 interface SidebarNavItemProps {
@@ -9,16 +9,21 @@ interface SidebarNavItemProps {
 }
 
 export function SidebarNavItem({ label, path, icon: Icon, collapsed }: SidebarNavItemProps) {
+  const location = useLocation();
+  const isActive = location.pathname.startsWith(path) && (path !== '/' || location.pathname === '/');
+
   return (
-    <NavLink
-      to={path}
-      className={({ isActive }) =>
-        `sidebar__nav-item ${isActive ? 'sidebar__nav-item--active' : ''}`
-      }
-      title={collapsed ? label : undefined}
-    >
-      <Icon className="sidebar__nav-icon" />
-      {!collapsed && <span className="sidebar__nav-label">{label}</span>}
-    </NavLink>
+    <li className={`sidebar__nav-li ${isActive ? 'isActive' : ''}`}>
+      <NavLink
+        to={path}
+        className="sidebar__nav-item"
+        title={collapsed ? label : undefined}
+      >
+        <span className="icon">
+          <Icon size={20} />
+        </span>
+        {!collapsed && <span className="title">{label}</span>}
+      </NavLink>
+    </li>
   );
 }

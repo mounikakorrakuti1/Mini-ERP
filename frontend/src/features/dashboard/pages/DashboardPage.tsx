@@ -69,19 +69,16 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI Counters Grid */}
-      <div className="dashboard__grid">
+      {/* KPI Counters Grid -> .cardBox */}
+      <div className="cardBox">
         {metrics.map((metric) => (
-          <div key={metric.label} className="dashboard__kpi" style={{ transition: 'transform 0.2s', cursor: 'default' }}>
-            <div className="dashboard__kpi-icon" style={{ backgroundColor: metric.color }}>
-              <metric.icon size={20} />
+          <div key={metric.label} className="card">
+            <div>
+              <div className="numbers">{metric.value}</div>
+              <div className="cardName">{metric.label}</div>
             </div>
-            <div className="dashboard__kpi-content">
-              <div className="dashboard__kpi-label">{metric.label}</div>
-              <div className="dashboard__kpi-value">{metric.value}</div>
-              <div className="dashboard__kpi-trend" style={{ color: metric.isPositive ? 'var(--status-success)' : 'var(--status-danger)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '2px', marginTop: '4px' }}>
-                <span>{metric.trend}</span>
-              </div>
+            <div className="iconBx">
+              <metric.icon size={48} />
             </div>
           </div>
         ))}
@@ -135,7 +132,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--space-md)' }}>
+          <div className="details">
             {/* Active Users By Role Widget */}
             <div className="card">
               <h3 className="h3" style={{ borderBottom: '1px solid var(--border-main)', paddingBottom: 'var(--space-xs)', marginBottom: 'var(--space-sm)' }}>
