@@ -32,7 +32,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Audit Logs', path: ROUTES.AUDIT_LOGS, icon: History, module: MODULE.AUDIT_LOGS },
   { label: 'Analytics', path: ROUTES.ANALYTICS, icon: BarChart3, module: MODULE.ANALYTICS },
   { label: 'User Management', path: ROUTES.USER_MANAGEMENT, icon: ShieldCheck, module: MODULE.USER_MANAGEMENT },
-  { label: 'Profile', path: ROUTES.PROFILE, icon: User, module: MODULE.DASHBOARDS },
 ];
 
 interface SidebarProps {
@@ -57,7 +56,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <span className="icon">
               <Factory size={28} />
             </span>
-            <span className="title" style={{ fontWeight: 700, fontSize: '1.2rem' }}>Mini ERP</span>
+            <span className="title" style={{ fontWeight: 800, fontSize: '1.7rem', transform: 'translateY(4px)' }}>Mini ERP</span>
           </a>
         </li>
 

@@ -2,6 +2,14 @@
   Golden Ratio & 60/30/10 Architecture 
 */
 
+@font-face {
+  font-family: 'Flexing Demo';
+  src: url('./assets/fonts/Flexing Demo.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Mathematically robust Golden Ratio constant */
   --phi: 1.61803398875;
@@ -36,75 +44,94 @@
   --sidebar-collapsed-w: calc(4rem * var(--phi-inv) * var(--phi)); /* 4rem / 64px */
   --topbar-h: calc(4rem / var(--phi) * 1.5); /* ~3.7rem */
 
-  /* === LIGHT THEME PALETTE (60-30-10) === */
+  /* === LIGHT THEME PALETTE (Beach Palette - Skyblue/Papaya Whip) === */
+  /* 60%: Dominant Background (Papaya Whip) */
+  --color-60: #FCEDD6;
+  --color-surface: #FDF4E8;
   
-  /* 60%: Dominant Background (Pristine Pearl/Off-White) */
-  --color-60: #FAF9F6;
-  --color-surface: #FFFFFF;
+  /* 30%: Secondary Content (Skyblue / Baby Blue) */
+  --color-30: #97C6E0;
+  --color-30-muted: #7CA8C2;
+  --color-border: #97C6E0;
   
-  /* 30%: Secondary Content (Deep Slate for crisp typography and lines) */
-  --color-30: #2D3748;
-  --color-30-muted: #718096;
-  --color-border: #E2E8F0;
-  
-  /* 10%: Accent (Vibrant Ocean Blue for highly interactive elements) */
-  --color-10: #0369A1;
-  --color-10-hover: #0284C7;
-  --color-10-muted: #E0F2FE;
+  /* 10%: Accent (Caramel) */
+  --color-10: #C07F45;
+  --color-10-hover: #A66D3B;
+  --color-10-muted: #D9AA82;
 
   /* Status Colors */
-  --status-draft: #A0AEC0;
-  --status-confirmed: #3182CE;
-  --status-warning: #DD6B20;
-  --status-success: #38A169;
-  --status-danger: #E53E3E;
+  --status-draft: #94A3B8;
+  --status-confirmed: #6366F1;
+  --status-warning: #F59E0B;
+  --status-success: #10B981;
+  --status-danger: #EF4444;
+
+  --status-success-soft: rgba(56, 161, 105, 0.1);
+  --status-danger-soft: rgba(229, 62, 62, 0.1);
+  --status-warning-soft: rgba(221, 107, 32, 0.1);
 
   /* Font Family */
-  --font-sans: "Ubuntu", sans-serif;
+  --font-sans: 'Flexing Demo', "Ubuntu", sans-serif;
   
-  /* korsat-x-parmaga variables */
-  --blue: #2a2185;
-  --white: #fff;
-  --gray: #f5f5f5;
-  --black1: #222;
-  --black2: #999;
-
-  /* Semantics mapped to snippet */
-  --bg-app: var(--white);
-  --bg-surface: var(--white);
-  --text-main: var(--black1);
-  --text-muted: var(--black2);
-  --border-main: #e2e8f0;
-  --accent-main: var(--blue);
-  --accent-hover: #1e1b4b;
-}
-
-[data-theme="dark"] {
-  /* === DARK THEME PALETTE (60-30-10) === */
-  
-  /* 60%: Dominant Background (Deep Night) */
-  --color-60: #0F172A;
-  --color-surface: #1E293B;
-  
-  /* 30%: Secondary Content (Soft White/Slate for text and borders) */
-  --color-30: #F8FAFC;
-  --color-30-muted: #94A3B8;
-  --color-border: #334155;
-  
-  /* 10%: Accent (Bright Sky Blue) */
-  --color-10: #38BDF8;
-  --color-10-hover: #7DD3FC;
-  --color-10-muted: #0369A1;
-
-  /* Dark theme semantics map */
+  /* Semantics mapped to Beach palette */
   --bg-app: var(--color-60);
   --bg-surface: var(--color-surface);
-  --text-main: var(--color-30);
-  --text-muted: var(--color-30-muted);
+  --text-main: #333333;
+  --text-muted: #666666;
   --border-main: var(--color-border);
   --accent-main: var(--color-10);
   --accent-hover: var(--color-10-hover);
   --accent-soft: var(--color-10-muted);
+  --overlay-bg: rgba(0, 0, 0, 0.4);
+  --shadow-main: 0 4px 12px rgba(192, 127, 69, 0.1);
+
+  /* Sidebar styling for this palette (Skyblue/White) */
+  --sidebar-bg: var(--color-30);
+  --sidebar-text: #FFFFFF;
+  --sidebar-hover-bg: var(--color-60);
+  --sidebar-hover-text: var(--color-10);
+}
+
+[data-theme="dark"] {
+  /* === DARK THEME PALETTE (Deep Triadic) === */
+  /* High contrast, premium dark experience */
+  
+  /* 60%: Dominant Background (Deep Charcoal/Midnight) */
+  --color-60: #121212;
+  --color-surface: #1E1E1E;
+  
+  /* 30%: Secondary Content (Mint Green) */
+  --color-30: #95d9c0;
+  --color-30-muted: #76ae9a;
+  --color-border: #333333;
+  
+  /* 10%: Accent (Peach/Coral - Triadic to Green/Navy) */
+  --color-10: #FF8B8B;
+  --color-10-hover: #FF7070;
+  --color-10-muted: #2D1B1B;
+
+  /* Status overrides for dark mode if needed (slightly more vibrant) */
+  --status-success-soft: rgba(16, 185, 129, 0.2);
+  --status-danger-soft: rgba(239, 68, 68, 0.2);
+  --status-warning-soft: rgba(245, 158, 11, 0.2);
+
+  /* Semantics mapped to Dark palette */
+  --bg-app: var(--color-60);
+  --bg-surface: var(--color-surface);
+  --text-main: #E0E0E0;
+  --text-muted: #A0A0A0;
+  --border-main: var(--color-border);
+  --accent-main: var(--color-10);
+  --accent-hover: var(--color-10-hover);
+  --accent-soft: var(--accent-hover);
+  --overlay-bg: rgba(0, 0, 0, 0.6);
+  --shadow-main: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+  /* Sidebar styling for Dark theme (Pink/Black) */
+  --sidebar-bg: var(--color-10); /* Pink */
+  --sidebar-text: #1A2610; /* Dark text for contrast */
+  --sidebar-hover-bg: var(--color-60); /* Black Main Background */
+  --sidebar-hover-text: var(--color-30); /* Mint Green Text */
 }
 
 /* === CSS RESET & GLOBAL BASICS === */
@@ -121,6 +148,7 @@ body {
   color: var(--text-main);
   font-size: var(--text-base);
   line-height: var(--phi);
+  letter-spacing: 0.05em;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -184,7 +212,8 @@ input, textarea, select {
 }
 
 .btn--outline:hover {
-  background-color: var(--accent-soft);
+  background-color: var(--accent-hover);
+  color: #ffffff;
 }
 
 .btn--icon {
@@ -209,7 +238,7 @@ input, textarea, select {
 .card {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-main);
-  border-radius: var(--space-xs);
+  border-radius: var(--space-md);
   padding: var(--space-md);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); /* Extremely subtle elevation */
 }
@@ -232,7 +261,7 @@ input, textarea, select {
   font-size: var(--text-sm);
   background-color: var(--bg-surface);
   border: 1px solid var(--border-main);
-  border-radius: calc(var(--space-xs) * var(--phi-inv));
+  border-radius: var(--space-md);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -255,14 +284,19 @@ input, textarea, select {
   position: fixed;
   width: 240px;
   height: 100%;
-  background: var(--blue);
-  border-left: 10px solid var(--blue);
+  background: var(--sidebar-bg);
+  border-left: 10px solid var(--sidebar-bg);
+  border-radius: 0 25px 25px 0;
   transition: 0.5s;
   overflow: hidden;
   z-index: 1000;
 }
 .navigation.active {
   width: 80px;
+}
+
+.navigation.active .title {
+  display: none;
 }
 
 .navigation ul {
@@ -277,14 +311,14 @@ input, textarea, select {
   position: relative;
   width: 100%;
   list-style: none;
-  border-top-left-radius: 30px;
-  border-bottom-left-radius: 30px;
+  border-top-left-radius: 25px;
+  border-bottom-left-radius: 25px;
 }
 
 .navigation ul li:hover,
 .navigation ul li.hovered,
 .navigation ul li.isActive {
-  background-color: var(--white);
+  background-color: var(--sidebar-hover-bg);
 }
 
 .navigation ul li:nth-child(1) {
@@ -294,26 +328,26 @@ input, textarea, select {
 
 .navigation ul li a {
   position: relative;
-  display: block;
-  width: 100%;
   display: flex;
+  align-items: center;
+  width: 100%;
   text-decoration: none;
-  color: var(--white);
+  color: var(--sidebar-text);
 }
 
 .navigation ul li:hover a,
 .navigation ul li.hovered a,
 .navigation ul li.isActive a {
-  color: var(--blue);
+  color: var(--sidebar-hover-text);
 }
 
 .navigation ul li a .icon {
   position: relative;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 60px;
-  height: 42px;
-  line-height: 50px;
-  text-align: center;
+  height: 50px;
 }
 .navigation ul li a .icon lucide-icon,
 .navigation ul li a .icon svg {
@@ -324,8 +358,8 @@ input, textarea, select {
   position: relative;
   display: block;
   padding: 0 10px;
-  height: 42px;
-  line-height: 42px;
+  height: 50px;
+  line-height: 50px;
   text-align: start;
   white-space: nowrap;
   font-size: 14px;
@@ -343,7 +377,7 @@ input, textarea, select {
   height: 50px;
   background-color: transparent;
   border-radius: 50%;
-  box-shadow: 35px 35px 0 10px var(--white);
+  box-shadow: 35px 35px 0 10px var(--sidebar-hover-bg);
   pointer-events: none;
   transition: 0.1s;
 }
@@ -359,7 +393,7 @@ input, textarea, select {
   height: 50px;
   background-color: transparent;
   border-radius: 50%;
-  box-shadow: 35px -35px 0 10px var(--white);
+  box-shadow: 35px -35px 0 10px var(--sidebar-hover-bg);
   pointer-events: none;
   transition: 0.1s;
 }
@@ -369,7 +403,7 @@ input, textarea, select {
   background-color: transparent;
 }
 .navigation ul:hover li.isActive:not(:hover) a {
-  color: var(--white);
+  color: var(--sidebar-text);
 }
 .navigation ul:hover li.isActive:not(:hover) a::before,
 .navigation ul:hover li.isActive:not(:hover) a::after {
@@ -382,7 +416,7 @@ input, textarea, select {
   width: calc(100% - 240px);
   left: 240px;
   min-height: 100vh;
-  background: var(--white);
+  background: var(--bg-app);
   transition: 0.5s;
 }
 .main.active {
@@ -419,17 +453,25 @@ input, textarea, select {
 .search label {
   position: relative;
   width: 100%;
+  display: flex;
+  align-items: center;
 }
 
 .search label input {
   width: 100%;
   height: 40px;
   border-radius: 40px;
-  padding: 5px 20px;
-  padding-left: 35px;
-  font-size: 18px;
+  padding: 3px 20px 0 38px; /* 3px top padding pushes font down to align base with icon */
+  font-size: var(--text-md);
+  background-color: var(--bg-app);
+  color: var(--text-main);
   outline: none;
-  border: 1px solid var(--black2);
+  border: 1px solid var(--color-30);
+  transition: all 0.3s;
+}
+
+.search label input:focus {
+  border-color: var(--accent-main);
 }
 
 .search label svg, 
@@ -437,8 +479,9 @@ input, textarea, select {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  left: 10px;
+  left: 14px;
   font-size: 1.2rem;
+  color: var(--text-muted);
 }
 
 .user {
@@ -474,6 +517,10 @@ input, textarea, select {
   padding: 0 var(--space-md);
   background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border-main);
+  margin: var(--space-xs);
+  width: calc(100% - (var(--space-xs) * 2));
+  border-radius: var(--space-md);
+  box-shadow: var(--shadow-main);
   flex-shrink: 0;
 }
 
@@ -489,6 +536,16 @@ input, textarea, select {
   gap: var(--space-sm);
   padding-left: var(--space-sm);
   border-left: 1px solid var(--border-main);
+}
+
+.topbar__user .btn--icon {
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
+}
+
+.topbar__user .btn--icon:hover {
+  background-color: var(--color-30-muted);
+  color: var(--sidebar-text);
 }
 
 .app-shell__content {
@@ -711,6 +768,45 @@ input, textarea, select {
 
 /* === DASHBOARD AND MODULE PAGES === */
 
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.page-header__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-sm);
+  height: 38px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-main);
+  border-radius: var(--space-md);
+}
+
+.page-header__search input {
+  border: none;
+  background: transparent;
+  width: 240px;
+  height: 100%;
+  font-size: var(--text-sm);
+}
+
+.page-header__search input:focus {
+  outline: none;
+}
+
 .dashboard {
   display: flex;
   flex-direction: column;
@@ -906,11 +1002,11 @@ input, textarea, select {
   text-transform: capitalize;
 }
 
-.status-badge--draft { background-color: var(--color-border); color: var(--text-main); }
-.status-badge--confirmed { background-color: var(--accent-soft); color: var(--accent-main); }
-.status-badge--warning { background-color: #FEF3C7; color: var(--status-warning); }
-.status-badge--success { background-color: #D1FAE5; color: var(--status-success); }
-.status-badge--danger { background-color: #FEE2E2; color: var(--status-danger); }
+.status-badge--draft    { background-color: var(--color-border);   color: var(--text-main); }
+.status-badge--confirmed { background-color: var(--sidebar-bg);      color: var(--sidebar-text); }
+.status-badge--warning  { background-color: var(--status-warning-soft); color: var(--status-warning); }
+.status-badge--success  { background-color: var(--status-success-soft); color: var(--status-success); }
+.status-badge--danger   { background-color: var(--status-danger-soft);  color: var(--status-danger); }
 
 /* ======================= Cards ====================== */
 .cardBox {

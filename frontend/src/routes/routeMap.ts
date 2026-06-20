@@ -11,6 +11,7 @@ export const ROUTES = {
   PRODUCTS: '/products',
   PRODUCT_DETAIL: '/products/:id',
   PRODUCT_CREATE: '/products/new',
+  PRODUCT_EDIT: '/products/:id/edit',
 
   // Inventory
   INVENTORY_LEDGER: '/inventory/ledger',

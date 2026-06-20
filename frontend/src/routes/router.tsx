@@ -94,6 +94,14 @@ export const router = createBrowserRouter([
               </PermissionRoute>
             ),
           },
+          {
+            path: ':id/edit',
+            element: (
+              <PermissionRoute module={MODULE.PRODUCTS} action={PERMISSION_ACTION.ADMIN}>
+                <ProductFormPage />
+              </PermissionRoute>
+            ),
+          },
           { path: ':id', element: <ProductDetailPage /> },
         ],
       },

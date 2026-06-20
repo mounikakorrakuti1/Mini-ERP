@@ -1,203 +1,150 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDb } from '@/store/db.store';
-import { History, Search, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react';
+import { api } from '@/lib/api';
+import { BookOpen, Search } from 'lucide-react';
+
+type Movement = {
+  id: string;
+  createdAt: string;
+  productId: string;
+  direction: 'IN' | 'OUT';
+  quantity: number;
+  sourceType: 'ADJUSTMENT' | 'SO' | 'PO' | 'MO';
+  sourceReference: string;
+  performedBy: string;
+  reason: string;
+  balance?: number;
+};
 
 export default function InventoryLedgerPage() {
-  const { stockMovements, products } = useDb();
+  const { products } = useDb();
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // ─── Filters State ───────────────────────────────────────────────
+  // ── Filters ───────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
-  const [directionFilter, setDirectionFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
-  const [sourceTypeFilter, setSourceTypeFilter] = useState<string>('ALL');
+  const [productFilter, setProductFilter] = useState('ALL');
+  const [moduleFilter, setModuleFilter] = useState('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
-  // ─── Filtering Logic ─────────────────────────────────────────────
-  const filteredMovements = stockMovements.filter((m) => {
-    const product = products.find((p) => p.id === m.productId);
-    const productName = product?.name.toLowerCase() || '';
-    const productCode = product?.code.toLowerCase() || '';
-    const query = search.toLowerCase();
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await api.get('/inventory/movements');
+        setMovements(res.data.data || []);
+      } catch { } finally { setIsLoading(false); }
+    };
+    load();
+  }, []);
 
-    const matchesSearch = productName.includes(query) || productCode.includes(query);
-    const matchesDirection = directionFilter === 'ALL' || m.direction === directionFilter;
-    const matchesSourceType = sourceTypeFilter === 'ALL' || m.sourceType === sourceTypeFilter;
-
-    return matchesSearch && matchesDirection && matchesSourceType;
+  const filtered = movements.filter(m => {
+    const product = products.find(p => p.id === m.productId);
+    const matchSearch = (product?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (m.sourceReference || '').toLowerCase().includes(search.toLowerCase()) ||
+      (m.reason || '').toLowerCase().includes(search.toLowerCase());
+    const matchProduct = productFilter === 'ALL' || m.productId === productFilter;
+    const matchModule = moduleFilter === 'ALL' || m.sourceType === moduleFilter;
+    const date = new Date(m.createdAt);
+    const matchFrom = !dateFrom || date >= new Date(dateFrom);
+    const matchTo = !dateTo || date <= new Date(dateTo + 'T23:59:59');
+    return matchSearch && matchProduct && matchModule && matchFrom && matchTo;
   });
+
+  const getModuleColor = (type: string) => {
+    switch (type) {
+      case 'SO': return { bg: 'rgba(139,92,246,0.1)', color: '#8b5cf6' };
+      case 'PO': return { bg: 'rgba(221,107,32,0.1)', color: 'var(--status-warning)' };
+      case 'MO': return { bg: 'rgba(56,161,105,0.1)', color: 'var(--status-success)' };
+      case 'ADJUSTMENT': return { bg: 'rgba(3,105,161,0.1)', color: 'var(--accent-main)' };
+      default: return { bg: 'var(--bg-app)', color: 'var(--text-muted)' };
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
       {/* Header */}
       <div>
         <h1 className="h1" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
-          <History size={28} color="var(--accent-main)" />
-          Stock Transaction Ledger
+          <BookOpen size={28} color="var(--accent-main)" /> Inventory Ledger
         </h1>
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Chronological audit trail of all warehouse stock movements: purchase order receipts, manufacturing logs, sales shipments, and inventory adjustments.
-        </p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Full audit trail of all stock IN/OUT movements</p>
       </div>
 
-      {/* Filters Toolbar */}
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 'var(--space-sm)',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: 'var(--space-sm) var(--space-md)',
-        }}
-      >
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)', flex: 1, minWidth: '320px' }}>
-          {/* Search */}
-          <div
-            className="input-field"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-xs)',
-              flex: 1,
-              minWidth: '220px',
-              padding: '0.4rem var(--space-sm)',
-            }}
-          >
-            <Search size={16} color="var(--text-muted)" />
-            <input
-              type="text"
-              placeholder="Search product code or name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ border: 'none', width: '100%', outline: 'none', background: 'transparent' }}
-            />
-          </div>
-
-          {/* Direction Filter */}
-          <select
-            className="input-field"
-            value={directionFilter}
-            onChange={(e) => setDirectionFilter(e.target.value as any)}
-            style={{ appearance: 'auto', padding: '0.4rem var(--space-sm)', minWidth: '130px' }}
-          >
-            <option value="ALL">All Directions</option>
-            <option value="IN">IN (Receipts)</option>
-            <option value="OUT">OUT (Shipments)</option>
-          </select>
-
-          {/* Source Type Filter */}
-          <select
-            className="input-field"
-            value={sourceTypeFilter}
-            onChange={(e) => setSourceTypeFilter(e.target.value)}
-            style={{ appearance: 'auto', padding: '0.4rem var(--space-sm)', minWidth: '150px' }}
-          >
-            <option value="ALL">All Sources</option>
-            <option value="ADJUSTMENT">Manual Adjustments</option>
-            <option value="SO">Sales Deliveries</option>
-            <option value="PO">Purchase Receipts</option>
-            <option value="MO">Manufacturing Logs</option>
-          </select>
+      {/* Filters */}
+      <div className="card" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)', alignItems: 'center', padding: 'var(--space-sm) var(--space-md)' }}>
+        <div className="input-field" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', flex: 1, minWidth: '200px', padding: '0.4rem var(--space-sm)' }}>
+          <Search size={16} color="var(--text-muted)" />
+          <input type="text" placeholder="Search reference, product, reason..." value={search} onChange={e => setSearch(e.target.value)} style={{ border: 'none', width: '100%', outline: 'none', background: 'transparent' }} />
         </div>
-
-        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Showing {filteredMovements.length} records
+        <select className="input-field" value={productFilter} onChange={e => setProductFilter(e.target.value)} style={{ appearance: 'auto', padding: '0.4rem var(--space-sm)', minWidth: '160px' }}>
+          <option value="ALL">All Products</option>
+          {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <select className="input-field" value={moduleFilter} onChange={e => setModuleFilter(e.target.value)} style={{ appearance: 'auto', padding: '0.4rem var(--space-sm)', minWidth: '130px' }}>
+          <option value="ALL">All Modules</option>
+          <option value="SO">Sales Orders</option>
+          <option value="PO">Purchase Orders</option>
+          <option value="MO">Manufacturing</option>
+          <option value="ADJUSTMENT">Adjustment</option>
+        </select>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <input className="input-field" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '0.4rem var(--space-sm)' }} />
+          <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)' }}>to</span>
+          <input className="input-field" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '0.4rem var(--space-sm)' }} />
         </div>
+        {(search || productFilter !== 'ALL' || moduleFilter !== 'ALL' || dateFrom || dateTo) && (
+          <button className="btn btn--outline" style={{ fontSize: 'var(--text-xs)', padding: '0.4rem var(--space-sm)' }} onClick={() => { setSearch(''); setProductFilter('ALL'); setModuleFilter('ALL'); setDateFrom(''); setDateTo(''); }}>
+            Clear Filters
+          </button>
+        )}
       </div>
 
-      {/* Ledger Table */}
+      {/* Table */}
       <div className="card" style={{ padding: 0, overflowX: 'auto', border: '1px solid var(--border-main)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
           <thead>
-            <tr style={{ borderBottom: '2px solid var(--border-main)', backgroundColor: 'var(--bg-app)', height: '40px' }}>
-              <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>Date & Time</th>
-              <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>Product SKU</th>
-              <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>Product Name</th>
-              <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', textAlign: 'center' }}>Direction</th>
-              <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', textAlign: 'right' }}>Quantity</th>
-              <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>Source</th>
-              <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>Reference</th>
-              <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>Performed By</th>
-              <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>Reason / Description</th>
+            <tr style={{ borderBottom: '2px solid var(--border-main)', backgroundColor: 'var(--bg-app)' }}>
+              {['Date', 'Product', 'Reference', 'Transaction Type', 'Qty In', 'Qty Out', 'User / Reason'].map(h => (
+                <th key={h} style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', textAlign: ['Qty In', 'Qty Out'].includes(h) ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {filteredMovements.length === 0 ? (
-              <tr>
-                <td colSpan={9} style={{ padding: 'var(--space-lg)', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No stock transactions match the selected criteria.
-                </td>
-              </tr>
+            {isLoading ? (
+              <tr><td colSpan={7} style={{ padding: 'var(--space-lg)', textAlign: 'center', color: 'var(--text-muted)' }}>Loading ledger...</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={7} style={{ padding: 'var(--space-lg)', textAlign: 'center', color: 'var(--text-muted)' }}>No movements found.</td></tr>
             ) : (
-              filteredMovements.map((m) => {
-                const product = products.find((p) => p.id === m.productId);
+              filtered.map(m => {
+                const product = products.find(p => p.id === m.productId);
+                const modStyle = getModuleColor(m.sourceType);
                 return (
-                  <tr key={m.id} style={{ borderBottom: '1px solid var(--border-main)', height: '44px' }}>
-                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>
-                      {new Date(m.date).toLocaleString()}
-                    </td>
-                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontFamily: 'monospace', fontWeight: 500 }}>
-                      {product?.code ?? 'N/A'}
+                  <tr key={m.id} style={{ borderBottom: '1px solid var(--border-main)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-app)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontSize: 'var(--text-xs)', whiteSpace: 'nowrap' }}>
+                      {new Date(m.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
                     </td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontSize: 'var(--text-sm)', fontWeight: 500 }}>
-                      {product?.name ?? 'Deleted Product'}
+                      <div>{product?.name ?? 'Unknown'}</div>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{product?.code}</div>
                     </td>
-                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'center' }}>
-                      <span
-                        className="text-xs"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '2px',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          fontWeight: 'bold',
-                          backgroundColor: m.direction === 'IN' ? 'rgba(56, 161, 105, 0.1)' : 'rgba(229, 62, 62, 0.1)',
-                          color: m.direction === 'IN' ? 'var(--status-success)' : 'var(--status-danger)',
-                        }}
-                      >
-                        {m.direction === 'IN' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                        {m.direction}
-                      </span>
+                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontSize: 'var(--text-xs)', fontFamily: 'monospace', color: 'var(--accent-main)' }}>
+                      {m.sourceReference || '—'}
                     </td>
-                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'right', fontWeight: 600, fontFamily: 'monospace' }}>
-                      {m.quantity}
+                    <td style={{ padding: 'var(--space-xs) var(--space-sm)' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: 'var(--text-xs)', fontWeight: 600, backgroundColor: modStyle.bg, color: modStyle.color }}>{m.sourceType}</span>
                     </td>
-                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontSize: 'var(--text-sm)' }}>
-                      <span
-                        className="text-xs"
-                        style={{
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          backgroundColor:
-                            m.sourceType === 'ADJUSTMENT'
-                              ? 'rgba(113, 128, 150, 0.1)'
-                              : m.sourceType === 'SO'
-                              ? 'rgba(3, 105, 161, 0.1)'
-                              : m.sourceType === 'PO'
-                              ? 'rgba(221, 107, 32, 0.1)'
-                              : 'rgba(56, 161, 105, 0.1)',
-                          color:
-                            m.sourceType === 'ADJUSTMENT'
-                              ? 'var(--text-muted)'
-                              : m.sourceType === 'SO'
-                              ? 'var(--accent-main)'
-                              : m.sourceType === 'PO'
-                              ? 'var(--status-warning)'
-                              : 'var(--status-success)',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {m.sourceType}
-                      </span>
+                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: m.direction === 'IN' ? 'var(--status-success)' : 'transparent', fontSize: 'var(--text-sm)' }}>
+                      {m.direction === 'IN' ? `+${m.quantity}` : ''}
                     </td>
-                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontFamily: 'monospace', fontSize: 'var(--text-sm)' }}>
-                      {m.sourceReference}
-                    </td>
-                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontSize: 'var(--text-sm)' }}>
-                      {m.performedBy}
+                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: m.direction === 'OUT' ? 'var(--status-danger)' : 'transparent', fontSize: 'var(--text-sm)' }}>
+                      {m.direction === 'OUT' ? `-${m.quantity}` : ''}
                     </td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                      {m.reason}
+                      <div style={{ fontWeight: 500, color: 'var(--text-main)' }}>{m.performedBy}</div>
+                      <div>{m.reason}</div>
                     </td>
                   </tr>
                 );
@@ -205,6 +152,9 @@ export default function InventoryLedgerPage() {
             )}
           </tbody>
         </table>
+      </div>
+      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textAlign: 'right' }}>
+        Showing {filtered.length} of {movements.length} movements
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom';
-import { Bell, Search, LogOut, Sun, Moon, Menu } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Bell, Search, LogOut, Sun, Moon, User } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useThemeStore } from '@/store/theme.store';
 import { ROUTES } from '@/routes/routeMap';
@@ -38,12 +38,12 @@ export function Topbar({}: TopbarProps) {
         </button>
 
         <div className="topbar__user">
-          <div className="user">
-            <img src="https://ui-avatars.com/api/?name=Admin&background=2a2185&color=fff" alt="User" />
-          </div>
+          <Link to={ROUTES.PROFILE} className="btn btn--icon" title="Profile">
+            <User size={20} />
+          </Link>
         </div>
 
-        <button className="btn btn--icon" onClick={handleLogout} title="Logout" style={{ color: 'var(--status-danger)' }}>
+        <button className="btn btn--icon" onClick={handleLogout} title="Logout">
           <LogOut size={20} />
         </button>
       </div>
