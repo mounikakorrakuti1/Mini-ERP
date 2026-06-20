@@ -59,6 +59,7 @@ import TraceabilityPage from '@/features/procurement/pages/TraceabilityPage';
 import AuditLogPage from '@/features/audit-logs/pages/AuditLogPage';
 import AnalyticsPage from '@/features/analytics/pages/AnalyticsPage';
 import UserManagementPage from '@/features/rbac/pages/UserManagementPage';
+import UserDetailPage from '@/features/rbac/pages/UserDetailPage';
 import ProfilePage from '@/features/rbac/pages/ProfilePage';
 
 export const router = createBrowserRouter([
@@ -210,11 +211,11 @@ export const router = createBrowserRouter([
       { path: 'analytics', element: <AnalyticsPage /> },
       {
         path: 'admin/users',
-        element: (
-          <PermissionRoute module={MODULE.USER_MANAGEMENT} action={PERMISSION_ACTION.ADMIN}>
-            <UserManagementPage />
-          </PermissionRoute>
-        ),
+        element: <PermissionRoute module={MODULE.USER_MANAGEMENT} action={PERMISSION_ACTION.ADMIN} />,
+        children: [
+          { index: true, element: <UserManagementPage /> },
+          { path: ':id', element: <UserDetailPage /> },
+        ]
       },
       { path: 'profile', element: <ProfilePage /> },
     ],

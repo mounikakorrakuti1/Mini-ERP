@@ -500,16 +500,19 @@ app.get(
   '/sales-orders',
   authenticate,
   requirePermission('SALES_ORDERS', 'VIEW'),
-  asyncHandler(async (q, r) =>
+  asyncHandler(async (q, r) => {
+    const where: any = {};
+    if (q.query.status) where.status = String(q.query.status);
+    if (q.query.salesPersonId) where.salesPersonId = String(q.query.salesPersonId);
     ok(
       r,
       await prisma.salesOrder.findMany({
-        where: q.query.status ? { status: String(q.query.status) as any } : undefined,
-        include: { items: true, customer: true },
+        where,
+        include: { items: { include: { product: true } }, customer: true },
         orderBy: { createdAt: 'desc' },
       }),
-    ),
-  ),
+    );
+  }),
 );
 app.get(
   '/sales-orders/:id',
@@ -570,9 +573,16 @@ app.get(
   '/purchase-orders',
   authenticate,
   requirePermission('PURCHASE_ORDERS', 'VIEW'),
-  asyncHandler(async (_q, r) =>
-    ok(r, await prisma.purchaseOrder.findMany({ include: { items: true, vendor: true }, orderBy: { createdAt: 'desc' } })),
-  ),
+  asyncHandler(async (q, r) => {
+    const where: any = {};
+    if (q.query.status) where.status = String(q.query.status);
+    if (q.query.responsiblePersonId) where.responsiblePersonId = String(q.query.responsiblePersonId);
+    ok(r, await prisma.purchaseOrder.findMany({ 
+      where,
+      include: { items: { include: { product: true } }, vendor: true }, 
+      orderBy: { createdAt: 'desc' } 
+    }));
+  }),
 );
 app.get(
   '/purchase-orders/:id',
@@ -734,9 +744,12 @@ app.get(
   '/manufacturing-orders',
   authenticate,
   requirePermission('MANUFACTURING_ORDERS', 'VIEW'),
-  asyncHandler(async (_q, r) =>
-    ok(r, await prisma.manufacturingOrder.findMany({ include: { items: { include: { product: true } }, workOrders: true, finishedProduct: true, bom: true }, orderBy: { createdAt: 'desc' } })),
-  ),
+  asyncHandler(async (q, r) => {
+    const where: any = {};
+    if (q.query.status) where.status = String(q.query.status);
+    if (q.query.operatorId) where.workOrders = { some: { operatorId: String(q.query.operatorId) } };
+    ok(r, await prisma.manufacturingOrder.findMany({ where, include: { items: { include: { product: true } }, workOrders: true, finishedProduct: true, bom: true }, orderBy: { createdAt: 'desc' } }));
+  }),
 );
 app.get(
   '/manufacturing-orders/:id',
@@ -995,6 +1008,18 @@ app.get(
       orderBy: { createdAt: 'desc' }
     });
     ok(r, users);
+  })
+);
+app.get(
+  '/admin/users/:id',
+  authenticate,
+  requirePermission('USER_MANAGEMENT', 'VIEW'),
+  asyncHandler(async (q, r) => {
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: q.params.id },
+      include: { roles: { include: { role: true } } },
+    });
+    ok(r, user);
   })
 );
 app.patch(

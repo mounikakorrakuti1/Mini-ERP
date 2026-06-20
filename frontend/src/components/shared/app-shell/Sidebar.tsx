@@ -20,6 +20,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: ROUTES.DASHBOARD, icon: LayoutDashboard, module: MODULE.DASHBOARDS },
+  { label: 'User Management', path: ROUTES.USER_MANAGEMENT, icon: ShieldCheck, module: MODULE.USER_MANAGEMENT },
   { label: 'Products', path: ROUTES.PRODUCTS, icon: Package, module: MODULE.PRODUCTS },
   { label: 'Inventory', path: ROUTES.INVENTORY_SUMMARY, icon: Boxes, module: MODULE.INVENTORY },
   { label: 'Sales Orders', path: ROUTES.SALES_ORDERS, icon: ShoppingCart, module: MODULE.SALES_ORDERS },
@@ -31,7 +32,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Vendors', path: ROUTES.VENDORS, icon: Building2, module: MODULE.VENDORS },
   { label: 'Audit Logs', path: ROUTES.AUDIT_LOGS, icon: History, module: MODULE.AUDIT_LOGS },
   { label: 'Analytics', path: ROUTES.ANALYTICS, icon: BarChart3, module: MODULE.ANALYTICS },
-  { label: 'User Management', path: ROUTES.USER_MANAGEMENT, icon: ShieldCheck, module: MODULE.USER_MANAGEMENT },
 ];
 
 interface SidebarProps {

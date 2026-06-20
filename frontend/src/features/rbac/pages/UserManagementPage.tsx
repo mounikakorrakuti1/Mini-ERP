@@ -10,6 +10,7 @@ export default function UserManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [roleFilter, setRoleFilter] = useState('ALL');
   
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [formData, setFormData] = useState({ position: '', active: true, roleId: '' });
@@ -34,12 +35,26 @@ export default function UserManagementPage() {
     }
   };
 
+  const ROLE_BUTTONS = [
+    { label: 'Sales User',        value: 'Sales User' },
+    { label: 'Purchase User',     value: 'Purchase User' },
+    { label: 'Manufacturing User',  value: 'Manufacturing User' },
+    { label: 'Inventory Manager', value: 'Inventory Manager' },
+    { label: 'Business Owner',    value: 'Business Owner' },
+    { label: 'No Role',           value: 'NO_ROLE' },
+  ];
+
   const filteredUsers = users.filter(u => {
     const matchSearch = (u.name || '').toLowerCase().includes(search.toLowerCase()) || 
                       (u.email || '').toLowerCase().includes(search.toLowerCase()) ||
                       (u.loginId || '').toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'ALL' || (statusFilter === 'ACTIVE' ? u.active : !u.active);
-    return matchSearch && matchStatus;
+    const userRoleName = u.roles?.length > 0 ? u.roles[0].role.name : '';
+    const matchRole =
+      roleFilter === 'ALL' ? true :
+      roleFilter === 'NO_ROLE' ? !userRoleName :
+      userRoleName.toLowerCase() === roleFilter.toLowerCase();
+    return matchSearch && matchStatus && matchRole;
   });
 
   const openEditModal = (user: any) => {
@@ -109,6 +124,44 @@ export default function UserManagementPage() {
         </span>
       </div>
 
+      {/* Role Filter Buttons */}
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 'var(--space-xs)',
+        alignItems: 'center',
+      }}>
+        <button
+          className="btn"
+          onClick={() => setRoleFilter('ALL')}
+          style={{
+            border: `1px solid ${roleFilter === 'ALL' ? 'var(--accent-main)' : 'var(--border-main)'}`,
+            backgroundColor: roleFilter === 'ALL' ? 'var(--accent-main)' : 'transparent',
+            color: roleFilter === 'ALL' ? '#fff' : 'var(--text-main)',
+            fontWeight: roleFilter === 'ALL' ? 700 : 500,
+            transition: 'all 0.2s ease',
+          }}
+        >
+          All Users
+        </button>
+        {ROLE_BUTTONS.map(rb => (
+          <button
+            key={rb.value}
+            className="btn"
+            onClick={() => setRoleFilter(prev => prev === rb.value ? 'ALL' : rb.value)}
+            style={{
+              border: `1px solid ${roleFilter === rb.value ? 'var(--accent-main)' : 'var(--border-main)'}`,
+              backgroundColor: roleFilter === rb.value ? 'var(--accent-main)' : 'transparent',
+              color: roleFilter === rb.value ? '#fff' : 'var(--text-main)',
+              fontWeight: roleFilter === rb.value ? 700 : 500,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {rb.label}
+          </button>
+        ))}
+      </div>
+
       {/* Users Table */}
       <div className="card" style={{ padding: 0, overflowX: 'auto', border: '1px solid var(--border-main)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '850px' }}>
@@ -123,7 +176,13 @@ export default function UserManagementPage() {
             {isLoading ? (
               <tr><td colSpan={6} style={{ padding: 'var(--space-lg)', textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</td></tr>
             ) : filteredUsers.map(user => (
-              <tr key={user.id} style={{ borderBottom: '1px solid var(--border-main)' }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-app)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
+              <tr 
+                key={user.id} 
+                style={{ borderBottom: '1px solid var(--border-main)', cursor: 'pointer' }} 
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-app)')} 
+                onMouseLeave={e => (e.currentTarget.style.background = '')}
+                onClick={() => navigate(`/admin/users/${user.id}`)}
+              >
                 <td style={{ padding: 'var(--space-xs) var(--space-sm)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--accent-soft)', color: 'var(--accent-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
@@ -157,11 +216,11 @@ export default function UserManagementPage() {
                 <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'right' }}>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                     {!user.active && (
-                      <button className="btn btn--secondary" onClick={() => activateUser(user.id)} style={{ whiteSpace: 'nowrap' }}>
+                      <button className="btn btn--secondary" onClick={(e) => { e.stopPropagation(); activateUser(user.id); }} style={{ whiteSpace: 'nowrap' }}>
                         Accept
                       </button>
                     )}
-                    <button className="btn btn--icon" onClick={() => openEditModal(user)}>
+                    <button className="btn btn--icon" onClick={(e) => { e.stopPropagation(); openEditModal(user); }}>
                       <Edit2 size={15} color="var(--accent-main)" />
                     </button>
                   </div>

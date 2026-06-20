@@ -50,5 +50,6 @@ export const ROUTES = {
   AUDIT_LOGS: '/audit-logs',
   ANALYTICS: '/analytics',
   USER_MANAGEMENT: '/admin/users',
+  USER_DETAIL: '/admin/users/:id',
   PROFILE: '/profile',
 } as const;
