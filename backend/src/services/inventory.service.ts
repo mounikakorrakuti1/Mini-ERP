@@ -1,5 +1,6 @@
 import { Prisma, StockDirection, StockSource } from '@prisma/client';
 import { AppError } from '../lib/errors.js';
+import { notificationService } from './notification.service.js';
 export class InventoryService {
   async lockProduct(tx: Prisma.TransactionClient, productId: string) {
     await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
@@ -202,6 +203,7 @@ export class InventoryService {
         newValue: String(updated.onHandQty),
       },
     });
+    await notificationService.checkLowStock(tx, productId);
   }
 }
 export const inventoryService = new InventoryService();

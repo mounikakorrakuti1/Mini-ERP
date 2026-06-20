@@ -3,13 +3,14 @@ import {
   Prisma,
   PurchaseStatus,
   SalesStatus,
-  StockDirection,
   StockSource,
 } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { audit } from '../lib/audit.js';
 import { AppError } from '../lib/errors.js';
 import { inventoryService } from './inventory.service.js';
+import { notificationService } from './notification.service.js';
+import { realtimeService } from './realtime.service.js';
 
 const ref = (prefix: string) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 const locked = (data: any, fields: string[]) =>
@@ -38,6 +39,7 @@ export class OrdersService {
           customerId: d.customerId,
           customerAddress: d.customerAddress,
           salesPersonId: d.salesPersonId,
+          expectedDeliveryDate: d.expectedDeliveryDate,
           items: {
             create: await Promise.all(
               d.items.map(async (i: any) => {
@@ -100,7 +102,7 @@ export class OrdersService {
   }
 
   async confirmSales(actor: string, id: string) {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id} FOR UPDATE`;
       const so = await tx.salesOrder.findUnique({
         where: { id },
@@ -154,8 +156,15 @@ export class OrdersService {
         so.status,
         updated.status,
       );
+      await notificationService.notifyAdmins(
+        tx,
+        'SALES_ORDER_CONFIRMED',
+        `${updated.reference} confirmed. Stock reserved and procurement checked.`,
+      );
       return updated;
     });
+    await realtimeService.broadcastDashboardUpdate();
+    return result;
   }
 
   private async createProcurement(
@@ -195,6 +204,7 @@ export class OrdersService {
           status: PurchaseStatus.DRAFT,
           autoCreated: true,
           triggerSourceSoId: salesOrderId,
+          expectedReceiptDate: new Date(Date.now() + 7 * 86_400_000),
           items: {
             create: { productId: product.id, orderedQty: shortage, costPrice: product.costPrice },
           },
@@ -210,6 +220,16 @@ export class OrdersService {
         'triggerSourceSoId',
         null,
         salesOrderId,
+      );
+      await notificationService.notifyAdmins(
+        tx,
+        'PURCHASE_ORDER_CREATED',
+        `${po.reference} auto-created for sales order shortage.`,
+      );
+      await notificationService.notifyAdmins(
+        tx,
+        'PROCUREMENT_GENERATED',
+        `Procurement generated: ${po.reference} for sales order ${salesOrderId}.`,
       );
       return;
     }
@@ -229,6 +249,7 @@ export class OrdersService {
           quantity: shortage,
           autoCreated: true,
           triggerSourceSoId: salesOrderId,
+          plannedCompletionDate: new Date(Date.now() + 5 * 86_400_000),
           items: {
             create: bom.items.map((x) => ({
               productId: x.productId,
@@ -255,13 +276,23 @@ export class OrdersService {
         null,
         salesOrderId,
       );
+      await notificationService.notifyAdmins(
+        tx,
+        'MANUFACTURING_ORDER_CREATED',
+        `${mo.reference} auto-created for sales order shortage.`,
+      );
+      await notificationService.notifyAdmins(
+        tx,
+        'PROCUREMENT_GENERATED',
+        `Procurement generated: ${mo.reference} for sales order ${salesOrderId}.`,
+      );
       return;
     }
     throw new AppError(422, 'Product is missing procurement type');
   }
 
   async deliverSales(actor: string, id: string, lines: any[]) {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id} FOR UPDATE`;
       const so = await tx.salesOrder.findUnique({ where: { id }, include: { items: true } });
       if (!so) throw new AppError(404, 'Sales order not found');
@@ -323,6 +354,8 @@ export class OrdersService {
       );
       return result;
     });
+    await realtimeService.broadcastDashboardUpdate();
+    return result;
   }
 
   async cancelSales(actor: string, id: string) {
@@ -353,7 +386,7 @@ export class OrdersService {
   }
 
   async createPurchase(actor: string, d: any) {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       if (!d.items?.length) throw new AppError(422, 'Purchase order requires at least one item');
       requireUniqueProducts(d.items, 'Purchase order');
       const vendor = await tx.vendor.findUnique({ where: { id: d.vendorId } });
@@ -363,6 +396,7 @@ export class OrdersService {
           reference: ref('PO'),
           vendorId: d.vendorId,
           vendorAddress: d.vendorAddress,
+          expectedReceiptDate: d.expectedReceiptDate,
           items: {
             create: await Promise.all(
               d.items.map(async (i: any) => {
@@ -390,8 +424,14 @@ export class OrdersService {
         null,
         po.reference,
       );
+      await notificationService.notifyAdmins(
+        tx,
+        'PURCHASE_ORDER_CREATED',
+        `${po.reference} created for vendor ${vendor.name}.`,
+      );
       return po;
     });
+    return result;
   }
 
   async updatePurchase(actor: string, id: string, data: any) {
@@ -451,7 +491,7 @@ export class OrdersService {
   }
 
   async receivePurchase(actor: string, id: string, lines: any[]) {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${id} FOR UPDATE`;
       const po = await tx.purchaseOrder.findUnique({ where: { id }, include: { items: true } });
       if (!po) throw new AppError(404, 'Purchase order not found');
@@ -507,8 +547,15 @@ export class OrdersService {
         po.status,
         result.status,
       );
+      await notificationService.notifyAdmins(
+        tx,
+        'PURCHASE_ORDER_RECEIVED',
+        `${result.reference} ${result.status}.`,
+      );
       return result;
     });
+    await realtimeService.broadcastDashboardUpdate();
+    return result;
   }
 
   async cancelPurchase(actor: string, id: string) {
@@ -538,7 +585,7 @@ export class OrdersService {
   }
 
   async createMo(actor: string, d: any) {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const bom = await tx.bom.findUnique({
         where: { id: d.bomId },
         include: { items: true, operations: true },
@@ -554,6 +601,7 @@ export class OrdersService {
           finishedProductId: d.finishedProductId,
           bomId: bom.id,
           quantity: qty,
+          plannedCompletionDate: d.plannedCompletionDate,
           items: {
             create: bom.items.map((x) => ({
               productId: x.productId,
@@ -581,8 +629,14 @@ export class OrdersService {
         null,
         mo.reference,
       );
+      await notificationService.notifyAdmins(
+        tx,
+        'MANUFACTURING_ORDER_CREATED',
+        `${mo.reference} created for finished product ${d.finishedProductId}.`,
+      );
       return mo;
     });
+    return result;
   }
 
   async updateMo(actor: string, id: string, data: any) {
@@ -696,7 +750,7 @@ export class OrdersService {
   }
 
   async completeMo(actor: string, id: string) {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM manufacturing_orders WHERE id = ${id} FOR UPDATE`;
       const mo = await tx.manufacturingOrder.findUnique({
         where: { id },
@@ -759,8 +813,15 @@ export class OrdersService {
         mo.status,
         result.status,
       );
+      await notificationService.notifyAdmins(
+        tx,
+        'MANUFACTURING_ORDER_COMPLETED',
+        `${result.reference} completed and finished goods posted to inventory.`,
+      );
       return result;
     });
+    await realtimeService.broadcastDashboardUpdate();
+    return result;
   }
 
   async cancelMo(actor: string, id: string) {

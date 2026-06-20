@@ -137,6 +137,7 @@ model Product {
   costPrice Decimal @db.Decimal(14, 2)
   onHandQty Decimal @default(0) @db.Decimal(14, 3)
   reorderPoint Decimal @default(0) @db.Decimal(14, 3)
+  safetyStock Decimal @default(0) @db.Decimal(14, 3)
   procureOnDemand Boolean @default(false)
   procurementType ProcurementType?
   defaultVendorId String?
@@ -197,6 +198,7 @@ model SalesOrder {
   salesPersonId String?
   status SalesStatus @default(DRAFT)
   availabilityFlag Boolean @default(false)
+  expectedDeliveryDate DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
@@ -227,6 +229,7 @@ model PurchaseOrder {
   status PurchaseStatus @default(DRAFT)
   autoCreated Boolean @default(false)
   triggerSourceSoId String?
+  expectedReceiptDate DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Restrict)
@@ -255,6 +258,7 @@ model ManufacturingOrder {
   status ManufacturingStatus @default(DRAFT)
   autoCreated Boolean @default(false)
   triggerSourceSoId String?
+  plannedCompletionDate DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   finishedProduct Product @relation("FinishedGood", fields: [finishedProductId], references: [id], onDelete: Restrict)

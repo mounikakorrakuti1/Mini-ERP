@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createServer } from 'node:http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -13,9 +14,14 @@ import { AppError, asyncHandler, errorHandler } from './lib/errors.js';
 import { authenticate, requirePermission } from './middleware/auth.js';
 import { ordersService } from './services/orders.service.js';
 import { inventoryService } from './services/inventory.service.js';
+import { dashboardService } from './services/dashboard.service.js';
+import { notificationService } from './services/notification.service.js';
+import { realtimeService } from './services/realtime.service.js';
 import { openApiSpec } from './swagger.js';
 import { StockDirection, StockSource } from '@prisma/client';
 const app = express();
+const httpServer = createServer(app);
+realtimeService.init(httpServer);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
@@ -38,6 +44,34 @@ const items = z
     }),
   )
   .min(1);
+const dateField = z.coerce.date().optional();
+
+async function validateBom(tx: any, finishedProductId: string, items: any[]) {
+  if (!finishedProductId) throw new AppError(422, 'BoM finished product is required');
+  if (!items?.length) throw new AppError(422, 'BoM requires at least one component');
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (!item.productId) throw new AppError(422, 'BoM component product is required');
+    if (item.productId === finishedProductId) throw new AppError(422, 'BoM cannot reference its own finished product');
+    if (Number(item.quantity) <= 0) throw new AppError(422, 'BoM component quantity must be greater than zero');
+    if (seen.has(item.productId)) throw new AppError(422, 'BoM cannot contain duplicate components');
+    seen.add(item.productId);
+  }
+  const reachesFinished = async (productId: string, visited = new Set<string>()): Promise<boolean> => {
+    if (productId === finishedProductId) return true;
+    if (visited.has(productId)) return false;
+    visited.add(productId);
+    const product = await tx.product.findUnique({ where: { id: productId }, include: { defaultBom: { include: { items: true } } } });
+    if (!product?.defaultBom) return false;
+    for (const child of product.defaultBom.items) {
+      if (await reachesFinished(child.productId, visited)) return true;
+    }
+    return false;
+  };
+  for (const item of items) {
+    if (await reachesFinished(item.productId)) throw new AppError(422, 'Circular BoM reference detected');
+  }
+}
 app.get('/health', (_q, r) => r.json({ status: 'ok' }));
 app.use('/swagger', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 app.post(
@@ -272,10 +306,8 @@ app.post(
       reason: z.string().min(1),
     }),
   ),
-  asyncHandler(async (q, r) =>
-    ok(
-      r,
-      await prisma.$transaction(async (tx) => {
+  asyncHandler(async (q, r) => {
+    const balance = await prisma.$transaction(async (tx) => {
         await inventoryService.move(
           tx,
           q.user!.sub,
@@ -287,9 +319,10 @@ app.post(
           q.body.reason,
         );
         return inventoryService.balances(tx, q.params.id);
-      }),
-    ),
-  ),
+      });
+    await realtimeService.broadcastDashboardUpdate();
+    ok(r, balance);
+  }),
 );
 app.post(
   '/sales-orders',
@@ -300,6 +333,7 @@ app.post(
       customerId: id,
       customerAddress: z.string().optional(),
       salesPersonId: id.optional(),
+      expectedDeliveryDate: dateField,
       items,
     }),
   ),
@@ -308,35 +342,12 @@ app.post(
 app.get(
   '/dashboard/summary',
   authenticate,
-  asyncHandler(async (_q, r) => {
-    const [
-      totalSalesOrders,
-      pendingDeliveries,
-      manufacturingOrders,
-      delayedOrders,
-      totalPurchaseOrders,
-      partialReceipts,
-    ] = await Promise.all([
-      prisma.salesOrder.count(),
-      prisma.salesOrder.count({
-        where: { status: { in: ['CONFIRMED', 'PARTIALLY_DELIVERED'] as any } },
-      }),
-      prisma.manufacturingOrder.count({
-        where: { status: { in: ['DRAFT', 'CONFIRMED', 'IN_PROGRESS'] as any } },
-      }),
-      Promise.resolve(0),
-      prisma.purchaseOrder.count(),
-      prisma.purchaseOrder.count({ where: { status: 'PARTIALLY_RECEIVED' as any } }),
-    ]);
-    ok(r, {
-      totalSalesOrders,
-      pendingDeliveries,
-      manufacturingOrders,
-      delayedOrders,
-      totalPurchaseOrders,
-      partialReceipts,
-    });
-  }),
+  asyncHandler(async (_q, r) => ok(r, await dashboardService.summary())),
+);
+app.get(
+  '/dashboard/business-health',
+  authenticate,
+  asyncHandler(async (_q, r) => ok(r, await dashboardService.businessHealth())),
 );
 app.get(
   '/dashboard/role-summary',
@@ -348,19 +359,12 @@ app.get(
     });
     const roleNames = roles.map((x) => x.role.name);
     const base = { roles: roleNames };
-    const [sales, purchase, manufacturing, inventory, audit] = await Promise.all([
-      prisma.salesOrder.count({
-        where: { status: { in: ['CONFIRMED', 'PARTIALLY_DELIVERED'] as any } },
-      }),
-      prisma.purchaseOrder.count({
-        where: { status: { in: ['CONFIRMED', 'PARTIALLY_RECEIVED'] as any } },
-      }),
-      prisma.manufacturingOrder.count({
-        where: { status: { in: ['CONFIRMED', 'IN_PROGRESS'] as any } },
-      }),
-      prisma.product.count({ where: { active: true } }),
-      prisma.auditLog.count(),
-    ]);
+    const roleSummary = await dashboardService.roleSummary();
+    const sales = roleSummary.sales.pendingDeliveries;
+    const purchase = roleSummary.purchase.openPurchaseOrders;
+    const manufacturing = roleSummary.manufacturing.activeManufacturingOrders;
+    const inventory = roleSummary.admin.activeProducts;
+    const audit = roleSummary.admin.totalAuditLogs;
     if (roleNames.some((x) => x.includes('Sales')))
       return ok(r, {
         ...base,
@@ -453,7 +457,7 @@ app.post(
   '/purchase-orders',
   authenticate,
   requirePermission('CREATE_PURCHASE_ORDER'),
-  body(z.object({ vendorId: id, vendorAddress: z.string().optional(), items })),
+  body(z.object({ vendorId: id, vendorAddress: z.string().optional(), expectedReceiptDate: dateField, items })),
   asyncHandler(async (q, r) => ok(r, await ordersService.createPurchase(q.user!.sub, q.body), 201)),
 );
 app.get(
@@ -515,6 +519,7 @@ app.post(
     ok(
       r,
       await prisma.$transaction(async (tx) => {
+        await validateBom(tx, q.body.finishedProductId, q.body.items || []);
         const created = await tx.bom.create({
           data: {
             reference: `BOM-${Date.now()}`,
@@ -539,6 +544,53 @@ app.post(
         return created;
       }),
       201,
+    ),
+  ),
+);
+app.patch(
+  '/bom/:id',
+  authenticate,
+  requirePermission('EDIT_BOM'),
+  asyncHandler(async (q, r) =>
+    ok(
+      r,
+      await prisma.$transaction(async (tx) => {
+        const before = await tx.bom.findUniqueOrThrow({
+          where: { id: q.params.id },
+          include: { items: true, operations: true },
+        });
+        const finishedProductId = q.body.finishedProductId ?? before.finishedProductId;
+        const nextItems = q.body.items ?? before.items.map((item) => ({ productId: item.productId, quantity: item.quantity }));
+        await validateBom(tx, finishedProductId, nextItems);
+        const updated = await tx.bom.update({
+          where: { id: q.params.id },
+          data: {
+            finishedProductId,
+            referenceQty: q.body.referenceQty ?? before.referenceQty,
+            active: q.body.active ?? before.active,
+            ...(q.body.items
+              ? { items: { deleteMany: {}, create: q.body.items } }
+              : {}),
+            ...(q.body.operations
+              ? { operations: { deleteMany: {}, create: q.body.operations } }
+              : {}),
+          },
+          include: { items: true, operations: true },
+        });
+        await tx.auditLog.create({
+          data: {
+            actorId: q.user!.sub,
+            module: 'MANUFACTURING',
+            recordType: 'Bom',
+            recordId: updated.id,
+            action: 'UPDATE',
+            fieldName: 'id',
+            oldValue: before.id,
+            newValue: updated.id,
+          },
+        });
+        return updated;
+      }),
     ),
   ),
 );
