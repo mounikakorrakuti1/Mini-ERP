@@ -1,26 +1,80 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Factory, Ban } from 'lucide-react';
 import { ROUTES } from '@/routes/routeMap';
+import { api } from '@/lib/api';
 
 export default function ManufacturingOrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [order, setOrder] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Simulated status state
-  const [status, setStatus] = useState<string>('In Progress');
-
-  const handleMarkDone = () => {
-    setStatus('Done');
-    alert('Manufacturing Order marked as Done. Finished goods added to stock.');
-  };
-
-  const handleCancel = () => {
-    if (confirm('Are you sure you want to cancel this manufacturing order?')) {
-      setStatus('Cancelled');
-      alert('Manufacturing Order has been cancelled.');
+  const fetchOrder = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(`/manufacturing-orders/${id}`);
+      setOrder(res.data.data);
+    } catch (err) {
+      console.error('Failed to fetch manufacturing order', err);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchOrder();
+  }, [id]);
+
+  const handleStart = async () => {
+    try {
+      await api.patch(`/manufacturing-orders/${id}/start`);
+      alert('Manufacturing Order started.');
+      fetchOrder();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to start order');
+    }
+  };
+
+  const handleConfirm = async () => {
+    try {
+      await api.patch(`/manufacturing-orders/${id}/confirm`);
+      alert('Manufacturing Order confirmed.');
+      fetchOrder();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to confirm order');
+    }
+  };
+
+  const handleComplete = async () => {
+    try {
+      await api.patch(`/manufacturing-orders/${id}/complete`);
+      alert('Manufacturing Order marked as Done. Finished goods added to stock.');
+      fetchOrder();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to complete order');
+    }
+  };
+
+  const handleCancel = async () => {
+    if (confirm('Are you sure you want to cancel this manufacturing order?')) {
+      try {
+        await api.patch(`/manufacturing-orders/${id}/cancel`);
+        alert('Manufacturing Order has been cancelled.');
+        fetchOrder();
+      } catch (err: any) {
+        alert(err.response?.data?.message || 'Failed to cancel order');
+      }
+    }
+  };
+
+  if (isLoading) {
+    return <div style={{ padding: 'var(--space-xl)', textAlign: 'center' }}>Loading order details...</div>;
+  }
+
+  if (!order) {
+    return <div style={{ padding: 'var(--space-xl)', textAlign: 'center' }}>Order not found.</div>;
+  }
 
   return (
     <div>
@@ -35,28 +89,45 @@ export default function ManufacturingOrderDetailPage() {
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-              <h1 className="h2">{id}</h1>
+              <h1 className="h2">{order.reference || order.id.slice(0,8)}</h1>
               <span className={`status-badge ${
-                status === 'Draft' ? 'status-badge--draft' : 
-                status === 'Done' ? 'status-badge--success' : 
-                status === 'Cancelled' ? 'status-badge--danger' : 
-                'status-badge--confirmed'
-              }`}>{status}</span>
+                order.status === 'DRAFT' ? 'status-badge--draft' : 
+                order.status === 'COMPLETED' ? 'status-badge--success' : 
+                order.status === 'CANCELLED' ? 'status-badge--danger' : 
+                order.status === 'IN_PROGRESS' ? 'status-badge--confirmed' :
+                'status-badge--warning'
+              }`}>{order.status}</span>
             </div>
-            <p className="text-sm text-muted">Product: Executive Desk | Qty: 5</p>
+            <p className="text-sm text-muted">Product: {order.finishedProduct?.name || 'Unknown'} | Qty: {Number(order.quantity)}</p>
           </div>
         </div>
         <div className="page-header__actions">
-          {status === 'In Progress' && (
+          {order.status === 'DRAFT' && (
             <button 
               className="btn btn--primary" 
-              onClick={handleMarkDone}
+              onClick={handleConfirm}
+            >
+              <CheckCircle size={16} /> Confirm Order
+            </button>
+          )}
+          {order.status === 'CONFIRMED' && (
+            <button 
+              className="btn btn--primary" 
+              onClick={handleStart}
+            >
+              <Factory size={16} /> Start Production
+            </button>
+          )}
+          {order.status === 'IN_PROGRESS' && (
+            <button 
+              className="btn btn--primary" 
+              onClick={handleComplete}
               title="Finalize production and move items to finished goods inventory"
             >
               <CheckCircle size={16} /> Mark as Done
             </button>
           )}
-          {status !== 'Cancelled' && status !== 'Done' && (
+          {order.status !== 'CANCELLED' && order.status !== 'COMPLETED' && (
             <button 
               className="btn btn--outline" 
               style={{ color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
@@ -82,18 +153,18 @@ export default function ManufacturingOrderDetailPage() {
               </tr>
             </thead>
             <tbody>
-              <tr className="table__tr">
-                <td className="table__td">Oak Wood Planks</td>
-                <td className="table__td">25.00</td>
-                <td className="table__td">{status === 'Done' ? '25.00' : '0.00'}</td>
-                <td className="table__td"><span className="status-badge status-badge--success">Available</span></td>
-              </tr>
-              <tr className="table__tr">
-                <td className="table__td">Steel Screws</td>
-                <td className="table__td">500.00</td>
-                <td className="table__td">{status === 'Done' ? '500.00' : '0.00'}</td>
-                <td className="table__td"><span className="status-badge status-badge--success">Available</span></td>
-              </tr>
+              {order.items?.map((item: any) => (
+                <tr className="table__tr" key={item.id}>
+                  <td className="table__td">{item.product?.name || 'Unknown'}</td>
+                  <td className="table__td">{Number(item.requiredQty).toFixed(2)}</td>
+                  <td className="table__td">{Number(item.consumedQty).toFixed(2)}</td>
+                  <td className="table__td">
+                    <span className={`status-badge ${Number(item.consumedQty) >= Number(item.requiredQty) ? 'status-badge--success' : 'status-badge--warning'}`}>
+                      {Number(item.consumedQty) >= Number(item.requiredQty) ? 'Consumed' : 'Pending'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

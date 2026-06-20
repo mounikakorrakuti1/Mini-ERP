@@ -1,35 +1,83 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Truck, FileText, Ban } from 'lucide-react';
 import { ROUTES } from '@/routes/routeMap';
+import { api } from '@/lib/api';
 
 export default function SalesOrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [order, setOrder] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Simulated status state
-  const [status, setStatus] = useState<string>('Confirmed');
-
-  const handleConfirm = () => {
-    setStatus('Confirmed');
-    alert('Order Confirmed successfully!');
+  const fetchOrder = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(`/sales-orders/${id}`);
+      setOrder(res.data.data);
+    } catch (err) {
+      console.error('Failed to fetch order', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleCreateDelivery = () => {
-    setStatus('Partially Delivered');
-    alert('Delivery created! Status updated to Partially Delivered.');
+  useEffect(() => {
+    fetchOrder();
+  }, [id]);
+
+  const handleConfirm = async () => {
+    try {
+      await api.patch(`/sales-orders/${id}/confirm`);
+      alert('Order Confirmed successfully!');
+      fetchOrder();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to confirm order');
+    }
   };
 
-  const handleCancel = () => {
+  const handleCreateDelivery = async () => {
+    if (!order) return;
+    try {
+      // Just auto-deliver all ordered quantity
+      const itemsToDeliver = order.items.map((item: any) => ({
+        itemId: item.id,
+        deliveredQty: item.orderedQty - item.deliveredQty,
+      })).filter((i: any) => i.deliveredQty > 0);
+
+      await api.patch(`/sales-orders/${id}/deliver`, { items: itemsToDeliver });
+      alert('Delivery created! Status updated.');
+      fetchOrder();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to create delivery');
+    }
+  };
+
+  const handleCancel = async () => {
     if (confirm('Are you sure you want to cancel this order?')) {
-      setStatus('Cancelled');
-      alert('Order has been cancelled.');
+      try {
+        await api.patch(`/sales-orders/${id}/cancel`);
+        alert('Order has been cancelled.');
+        fetchOrder();
+      } catch (err: any) {
+        alert(err.response?.data?.message || 'Failed to cancel order');
+      }
     }
   };
 
   const handlePrint = () => {
     window.print();
   };
+
+  if (isLoading) {
+    return <div style={{ padding: 'var(--space-xl)', textAlign: 'center' }}>Loading order details...</div>;
+  }
+
+  if (!order) {
+    return <div style={{ padding: 'var(--space-xl)', textAlign: 'center' }}>Order not found.</div>;
+  }
+
+  const total = order.items.reduce((sum: number, item: any) => sum + (item.orderedQty * item.salesPrice), 0);
 
   return (
     <div>
@@ -44,19 +92,19 @@ export default function SalesOrderDetailPage() {
           </button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-              <h1 className="h2">{id}</h1>
+              <h1 className="h2">{order.reference || order.id.slice(0,8)}</h1>
               <span className={`status-badge ${
-                status === 'Draft' ? 'status-badge--draft' : 
-                status === 'Confirmed' ? 'status-badge--confirmed' : 
-                status === 'Cancelled' ? 'status-badge--danger' : 
+                order.status === 'DRAFT' ? 'status-badge--draft' : 
+                order.status === 'CONFIRMED' ? 'status-badge--confirmed' : 
+                order.status === 'CANCELLED' ? 'status-badge--danger' : 
                 'status-badge--success'
-              }`}>{status}</span>
+              }`}>{order.status}</span>
             </div>
-            <p className="text-sm text-muted">Customer: Global Enterprises</p>
+            <p className="text-sm text-muted">Customer: {order.customer?.name || 'Unknown'}</p>
           </div>
         </div>
         <div className="page-header__actions">
-          {status === 'Draft' && (
+          {order.status === 'DRAFT' && (
             <button 
               className="btn btn--primary" 
               onClick={handleConfirm}
@@ -65,13 +113,13 @@ export default function SalesOrderDetailPage() {
               <CheckCircle size={16} /> Confirm Order
             </button>
           )}
-          {(status === 'Confirmed' || status === 'Partially Delivered') && (
+          {(order.status === 'CONFIRMED' || order.status === 'PARTIALLY_DELIVERED') && (
             <button 
               className="btn btn--primary" 
               onClick={handleCreateDelivery}
               title="Create a warehouse delivery for the items in this order"
             >
-              <Truck size={16} /> Create Delivery
+              <Truck size={16} /> Deliver Remaining
             </button>
           )}
           <button 
@@ -81,7 +129,7 @@ export default function SalesOrderDetailPage() {
           >
             <FileText size={16} /> Print Invoice
           </button>
-          {status !== 'Cancelled' && status !== 'Fully Delivered' && (
+          {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && (
             <button 
               className="btn btn--outline" 
               style={{ color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
@@ -102,34 +150,28 @@ export default function SalesOrderDetailPage() {
               <tr>
                 <th className="table__th">Product</th>
                 <th className="table__th">Description</th>
-                <th className="table__th">Quantity</th>
-                <th className="table__th">Delivered</th>
+                <th className="table__th">Ordered Qty</th>
+                <th className="table__th">Delivered Qty</th>
                 <th className="table__th">Unit Price</th>
                 <th className="table__th">Subtotal</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="table__tr">
-                <td className="table__td">Executive Desk</td>
-                <td className="table__td">Oak wood finish</td>
-                <td className="table__td">5.00</td>
-                <td className="table__td">{status.includes('Delivered') ? '5.00' : '0.00'}</td>
-                <td className="table__td">$500.00</td>
-                <td className="table__td">$2,500.00</td>
-              </tr>
-              <tr className="table__tr">
-                <td className="table__td">Ergonomic Chair</td>
-                <td className="table__td">Mesh back, adjustable</td>
-                <td className="table__td">10.00</td>
-                <td className="table__td">{status === 'Partially Delivered' ? '2.00' : status === 'Fully Delivered' ? '10.00' : '0.00'}</td>
-                <td className="table__td">$200.00</td>
-                <td className="table__td">$2,000.00</td>
-              </tr>
+              {order.items.map((item: any) => (
+                <tr className="table__tr" key={item.id}>
+                  <td className="table__td">{item.product?.code || 'Unknown'}</td>
+                  <td className="table__td">{item.product?.name || 'Unknown'}</td>
+                  <td className="table__td">{item.orderedQty}</td>
+                  <td className="table__td">{item.deliveredQty}</td>
+                  <td className="table__td">${Number(item.salesPrice).toLocaleString()}</td>
+                  <td className="table__td">${(item.orderedQty * item.salesPrice).toLocaleString()}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
         <div style={{ marginTop: 'var(--space-md)', textAlign: 'right', fontWeight: 600, fontSize: 'var(--text-lg)' }}>
-          Total: $4,500.00
+          Total: ${total.toLocaleString()}
         </div>
       </div>
     </div>

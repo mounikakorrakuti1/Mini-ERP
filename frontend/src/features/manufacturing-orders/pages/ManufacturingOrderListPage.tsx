@@ -1,41 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Eye, Filter } from 'lucide-react';
 import { ROUTES } from '@/routes/routeMap';
-
-interface MfgOrder {
-  id: string;
-  product: string;
-  quantity: number;
-  date: string;
-  status: 'Draft' | 'Confirmed' | 'In_Progress' | 'Done' | 'Cancelled';
-}
-
-const mockOrders: MfgOrder[] = [
-  { id: 'MO-2026-0001', product: 'Executive Desk', quantity: 5, date: '2026-06-20', status: 'In_Progress' },
-  { id: 'MO-2026-0002', product: 'Ergonomic Chair', quantity: 20, date: '2026-06-21', status: 'Confirmed' },
-  { id: 'MO-2026-0003', product: 'Meeting Table', quantity: 2, date: '2026-06-25', status: 'Draft' },
-];
+import { api } from '@/lib/api';
 
 export default function ManufacturingOrderListPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const res = await api.get('/manufacturing-orders');
+        setOrders(res.data.data);
+      } catch (err) {
+        console.error('Failed to fetch manufacturing orders', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
 
   const getStatusClass = (status: string) => {
     switch (status) {
-      case 'Draft': return 'status-badge--draft';
-      case 'Confirmed': return 'status-badge--warning';
-      case 'In_Progress': return 'status-badge--confirmed';
-      case 'Done': return 'status-badge--success';
-      case 'Cancelled': return 'status-badge--danger';
+      case 'DRAFT': return 'status-badge--draft';
+      case 'CONFIRMED': return 'status-badge--warning';
+      case 'IN_PROGRESS': return 'status-badge--confirmed';
+      case 'COMPLETED': return 'status-badge--success';
+      case 'CANCELLED': return 'status-badge--danger';
       default: return 'status-badge--draft';
     }
   };
 
-  const filteredOrders = mockOrders.filter(o => 
-    o.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    o.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.status.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredOrders = orders.filter(o => {
+    const q = searchQuery.toLowerCase();
+    const ref = (o.reference || o.id).toLowerCase();
+    const product = (o.finishedProduct?.name || '').toLowerCase();
+    const status = (o.status || '').toLowerCase();
+    return ref.includes(q) || product.includes(q) || status.includes(q);
+  });
 
   return (
     <div>
@@ -76,13 +81,19 @@ export default function ManufacturingOrderListPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredOrders.length > 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} className="table__td" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 'var(--space-md)' }}>
+                  Loading orders...
+                </td>
+              </tr>
+            ) : filteredOrders.length > 0 ? (
               filteredOrders.map((order) => (
               <tr key={order.id} className="table__tr">
-                <td className="table__td" style={{ fontWeight: 500 }}>{order.id}</td>
-                <td className="table__td">{order.product}</td>
-                <td className="table__td">{order.quantity}</td>
-                <td className="table__td">{order.date}</td>
+                <td className="table__td" style={{ fontWeight: 500 }}>{order.reference || order.id.slice(0,8)}</td>
+                <td className="table__td">{order.finishedProduct?.name || 'Unknown'}</td>
+                <td className="table__td">{Number(order.quantity).toFixed(2)}</td>
+                <td className="table__td">{order.plannedCompletionDate ? new Date(order.plannedCompletionDate).toLocaleDateString() : 'N/A'}</td>
                 <td className="table__td">
                   <span className={`status-badge ${getStatusClass(order.status)}`}>
                     {order.status.replace('_', ' ')}

@@ -1,14 +1,69 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react';
 import { ROUTES } from '@/routes/routeMap';
+import { useDb } from '@/store/db.store';
+import { api } from '@/lib/api';
 
 export default function SalesOrderCreatePage() {
   const navigate = useNavigate();
+  const { customers, products } = useDb();
+  
+  const [customerId, setCustomerId] = useState('');
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
+  const [items, setItems] = useState<any[]>([{ productId: '', orderedQty: 1, salesPrice: 0 }]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    navigate(ROUTES.SALES_ORDERS);
+  const handleProductChange = (index: number, productId: string) => {
+    const product = products.find(p => p.id === productId);
+    const newItems = [...items];
+    newItems[index] = { 
+      ...newItems[index], 
+      productId, 
+      salesPrice: product ? product.salesPrice : 0 
+    };
+    setItems(newItems);
   };
+
+  const handleItemChange = (index: number, field: string, value: any) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setItems(newItems);
+  };
+
+  const addItem = () => setItems([...items, { productId: '', orderedQty: 1, salesPrice: 0 }]);
+  
+  const removeItem = (index: number) => {
+    const newItems = [...items];
+    newItems.splice(index, 1);
+    setItems(newItems);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerId || items.some(i => !i.productId || i.orderedQty <= 0)) {
+      alert('Please fill in all required fields properly.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await api.post('/sales-orders', {
+        customerId,
+        expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate).toISOString() : undefined,
+        items: items.map(i => ({
+          productId: i.productId,
+          orderedQty: Number(i.orderedQty),
+          salesPrice: Number(i.salesPrice)
+        }))
+      });
+      navigate(ROUTES.SALES_ORDERS);
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Failed to create sales order');
+      setIsSubmitting(false);
+    }
+  };
+
+  const total = items.reduce((sum, item) => sum + (item.orderedQty * item.salesPrice), 0);
 
   return (
     <div>
@@ -24,8 +79,8 @@ export default function SalesOrderCreatePage() {
         </div>
         <div className="page-header__actions">
           <button className="btn btn--outline" onClick={() => navigate(-1)}>Cancel</button>
-          <button className="btn btn--primary" onClick={handleSubmit}>
-            <Save size={16} /> Save Draft
+          <button className="btn btn--primary" onClick={handleSubmit} disabled={isSubmitting}>
+            <Save size={16} /> {isSubmitting ? 'Saving...' : 'Save Order'}
           </button>
         </div>
       </div>
@@ -35,16 +90,17 @@ export default function SalesOrderCreatePage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
             <div className="input-group">
               <label className="input-label">Customer</label>
-              <select className="input-field">
+              <select className="input-field" value={customerId} onChange={(e) => setCustomerId(e.target.value)} required>
                 <option value="">Select a Customer</option>
-                <option value="1">Acme Corp</option>
-                <option value="2">Global Enterprises</option>
+                {customers?.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
               </select>
             </div>
             
             <div className="input-group">
               <label className="input-label">Expected Date</label>
-              <input type="date" className="input-field" />
+              <input type="date" className="input-field" value={expectedDeliveryDate} onChange={e => setExpectedDeliveryDate(e.target.value)} />
             </div>
           </div>
 
@@ -55,31 +111,45 @@ export default function SalesOrderCreatePage() {
                 <thead>
                   <tr>
                     <th className="table__th">Product</th>
-                    <th className="table__th">Description</th>
                     <th className="table__th">Quantity</th>
                     <th className="table__th">Unit Price</th>
                     <th className="table__th">Subtotal</th>
+                    <th className="table__th"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="table__tr">
-                    <td className="table__td">
-                      <select className="input-field" style={{ width: '100%' }}>
-                        <option value="">Select Product...</option>
-                        <option value="p1">Executive Desk</option>
-                      </select>
-                    </td>
-                    <td className="table__td"><input type="text" className="input-field" placeholder="Description" style={{ width: '100%' }} /></td>
-                    <td className="table__td"><input type="number" min="1" defaultValue="1" className="input-field" style={{ width: '80px' }} /></td>
-                    <td className="table__td"><input type="number" step="0.01" className="input-field" style={{ width: '120px' }} /></td>
-                    <td className="table__td">$0.00</td>
-                  </tr>
+                  {items.map((item, index) => (
+                    <tr className="table__tr" key={index}>
+                      <td className="table__td">
+                        <select className="input-field" style={{ width: '100%' }} value={item.productId} onChange={(e) => handleProductChange(index, e.target.value)} required>
+                          <option value="">Select Product...</option>
+                          {products?.filter(p => p.category === 'Finished Good' || p.category === 'Service').map(p => (
+                            <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="table__td"><input type="number" min="1" value={item.orderedQty} onChange={(e) => handleItemChange(index, 'orderedQty', e.target.value)} className="input-field" style={{ width: '100px' }} required /></td>
+                      <td className="table__td"><input type="number" step="0.01" value={item.salesPrice} onChange={(e) => handleItemChange(index, 'salesPrice', e.target.value)} className="input-field" style={{ width: '140px' }} required /></td>
+                      <td className="table__td" style={{ verticalAlign: 'middle' }}>${(item.orderedQty * item.salesPrice).toLocaleString()}</td>
+                      <td className="table__td" style={{ textAlign: 'right' }}>
+                        <button type="button" className="btn btn--icon" style={{ color: 'var(--status-danger)' }} onClick={() => removeItem(index)}>
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-            <button type="button" className="btn btn--outline" style={{ marginTop: 'var(--space-sm)' }}>
-              Add Line Item
-            </button>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-sm)' }}>
+              <button type="button" className="btn btn--outline" onClick={addItem}>
+                <Plus size={16} /> Add Line Item
+              </button>
+              <div style={{ fontWeight: 600, fontSize: 'var(--text-lg)' }}>
+                Total: ${total.toLocaleString()}
+              </div>
+            </div>
           </div>
         </form>
       </div>

@@ -400,7 +400,7 @@ app.get(
       r,
       await prisma.salesOrder.findMany({
         where: q.query.status ? { status: String(q.query.status) as any } : undefined,
-        include: { items: true },
+        include: { items: true, customer: true },
         orderBy: { createdAt: 'desc' },
       }),
     ),
@@ -415,7 +415,7 @@ app.get(
       r,
       await prisma.salesOrder.findUniqueOrThrow({
         where: { id: q.params.id },
-        include: { items: { include: { product: true } }, reservations: true },
+        include: { items: { include: { product: true } }, reservations: true, customer: true },
       }),
     ),
   ),
@@ -465,7 +465,15 @@ app.get(
   authenticate,
   requirePermission('VIEW_PURCHASE_ORDER'),
   asyncHandler(async (_q, r) =>
-    ok(r, await prisma.purchaseOrder.findMany({ include: { items: true } })),
+    ok(r, await prisma.purchaseOrder.findMany({ include: { items: true, vendor: true }, orderBy: { createdAt: 'desc' } })),
+  ),
+);
+app.get(
+  '/purchase-orders/:id',
+  authenticate,
+  requirePermission('VIEW_PURCHASE_ORDER'),
+  asyncHandler(async (q, r) =>
+    ok(r, await prisma.purchaseOrder.findUniqueOrThrow({ where: { id: q.params.id }, include: { items: { include: { product: true } }, vendor: true } })),
   ),
 );
 app.patch(
@@ -508,7 +516,15 @@ app.get(
   authenticate,
   requirePermission('VIEW_BOM'),
   asyncHandler(async (_q, r) =>
-    ok(r, await prisma.bom.findMany({ include: { items: true, operations: true } })),
+    ok(r, await prisma.bom.findMany({ include: { items: { include: { product: true } }, operations: true, finishedProduct: true }, orderBy: { createdAt: 'desc' } })),
+  ),
+);
+app.get(
+  '/bom/:id',
+  authenticate,
+  requirePermission('VIEW_BOM'),
+  asyncHandler(async (q, r) =>
+    ok(r, await prisma.bom.findUniqueOrThrow({ where: { id: q.params.id }, include: { items: { include: { product: true } }, operations: true, finishedProduct: true } })),
   ),
 );
 app.post(
@@ -605,7 +621,15 @@ app.get(
   authenticate,
   requirePermission('VIEW_MANUFACTURING_ORDER'),
   asyncHandler(async (_q, r) =>
-    ok(r, await prisma.manufacturingOrder.findMany({ include: { items: true, workOrders: true } })),
+    ok(r, await prisma.manufacturingOrder.findMany({ include: { items: { include: { product: true } }, workOrders: true, finishedProduct: true, bom: true }, orderBy: { createdAt: 'desc' } })),
+  ),
+);
+app.get(
+  '/manufacturing-orders/:id',
+  authenticate,
+  requirePermission('VIEW_MANUFACTURING_ORDER'),
+  asyncHandler(async (q, r) =>
+    ok(r, await prisma.manufacturingOrder.findUniqueOrThrow({ where: { id: q.params.id }, include: { items: { include: { product: true } }, workOrders: true, finishedProduct: true, bom: true } })),
   ),
 );
 app.patch(

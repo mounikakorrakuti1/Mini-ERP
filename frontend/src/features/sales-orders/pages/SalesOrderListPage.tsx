@@ -1,41 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Eye } from 'lucide-react';
 import { ROUTES } from '@/routes/routeMap';
-
-interface SalesOrder {
-  id: string;
-  customerName: string;
-  date: string;
-  total: number;
-  status: 'Draft' | 'Confirmed' | 'Delivered' | 'Cancelled';
-}
-
-const mockOrders: SalesOrder[] = [
-  { id: 'SO-2026-0001', customerName: 'Acme Corp', date: '2026-06-19', total: 12500, status: 'Completed' as any },
-  { id: 'SO-2026-0002', customerName: 'Global Enterprises', date: '2026-06-20', total: 4500, status: 'Confirmed' },
-  { id: 'SO-2026-0003', customerName: 'Stark Industries', date: '2026-06-20', total: 8900, status: 'Draft' },
-];
+import { api } from '@/lib/api';
 
 export default function SalesOrderListPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const res = await api.get('/sales-orders');
+        setOrders(res.data.data);
+      } catch (err) {
+        console.error('Failed to fetch sales orders', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
 
   const getStatusClass = (status: string) => {
     switch (status) {
-      case 'Draft': return 'status-badge--draft';
-      case 'Confirmed': return 'status-badge--confirmed';
-      case 'Completed': 
-      case 'Delivered': return 'status-badge--success';
-      case 'Cancelled': return 'status-badge--danger';
+      case 'DRAFT': return 'status-badge--draft';
+      case 'CONFIRMED': return 'status-badge--confirmed';
+      case 'COMPLETED': 
+      case 'DELIVERED': return 'status-badge--success';
+      case 'CANCELLED': return 'status-badge--danger';
       default: return 'status-badge--draft';
     }
   };
 
-  const filteredOrders = mockOrders.filter(o => 
-    o.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    o.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.status.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredOrders = orders.filter(o => {
+    const q = searchQuery.toLowerCase();
+    const ref = (o.reference || o.id).toLowerCase();
+    const cust = (o.customer?.name || '').toLowerCase();
+    const status = (o.status || '').toLowerCase();
+    return ref.includes(q) || cust.includes(q) || status.includes(q);
+  });
 
   return (
     <div>
@@ -73,13 +78,21 @@ export default function SalesOrderListPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredOrders.length > 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} className="table__td" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 'var(--space-md)' }}>
+                  Loading orders...
+                </td>
+              </tr>
+            ) : filteredOrders.length > 0 ? (
               filteredOrders.map((order) => (
               <tr key={order.id} className="table__tr">
-                <td className="table__td" style={{ fontWeight: 500 }}>{order.id}</td>
-                <td className="table__td">{order.customerName}</td>
-                <td className="table__td">{order.date}</td>
-                <td className="table__td">${order.total.toLocaleString()}</td>
+                <td className="table__td" style={{ fontWeight: 500 }}>{order.reference || order.id.slice(0,8)}</td>
+                <td className="table__td">{order.customer?.name || 'Unknown'}</td>
+                <td className="table__td">{new Date(order.createdAt).toLocaleDateString()}</td>
+                <td className="table__td">
+                  ${order.items?.reduce((sum: number, item: any) => sum + (item.orderedQty * item.salesPrice), 0).toLocaleString()}
+                </td>
                 <td className="table__td">
                   <span className={`status-badge ${getStatusClass(order.status)}`}>
                     {order.status}

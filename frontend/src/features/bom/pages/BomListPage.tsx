@@ -2,25 +2,18 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Eye } from 'lucide-react';
 import { ROUTES } from '@/routes/routeMap';
-
-interface Bom {
-  id: string;
-  product: string;
-  components: number;
-}
-
-const mockBoms: Bom[] = [
-  { id: 'BOM-001', product: 'Executive Desk', components: 5 },
-  { id: 'BOM-002', product: 'Ergonomic Chair', components: 12 },
-];
+import { useDb } from '@/store/db.store';
 
 export default function BomListPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const { boms, isLoading } = useDb();
 
-  const filteredBoms = mockBoms.filter(b => 
-    b.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    b.product.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredBoms = boms.filter(b => {
+    const q = searchQuery.toLowerCase();
+    const ref = (b.reference || b.id).toLowerCase();
+    const product = (b.finishedProduct?.name || '').toLowerCase();
+    return ref.includes(q) || product.includes(q);
+  });
 
   return (
     <div>
@@ -56,12 +49,18 @@ export default function BomListPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredBoms.length > 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={4} className="table__td" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 'var(--space-md)' }}>
+                  Loading BoMs...
+                </td>
+              </tr>
+            ) : filteredBoms.length > 0 ? (
               filteredBoms.map((bom) => (
               <tr key={bom.id} className="table__tr">
-                <td className="table__td" style={{ fontWeight: 500 }}>{bom.id}</td>
-                <td className="table__td">{bom.product}</td>
-                <td className="table__td">{bom.components} components</td>
+                <td className="table__td" style={{ fontWeight: 500 }}>{bom.reference || bom.id.slice(0,8)}</td>
+                <td className="table__td">{bom.finishedProduct?.name || 'Unknown Product'}</td>
+                <td className="table__td">{bom.items?.length || 0} components</td>
                 <td className="table__td" style={{ textAlign: 'right' }}>
                   <Link to={`${ROUTES.BOM_LIST}/${bom.id}`} className="btn btn--icon">
                     <Eye size={18} color="var(--text-muted)" />

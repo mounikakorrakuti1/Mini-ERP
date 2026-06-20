@@ -1,53 +1,81 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { ROLE } from '@/types/enums';
 import type { Role } from '@/types/enums';
+import { api } from '@/lib/api';
 
 // ─── Types ──────────────────────────────────────────────────────
 
-export interface MockUser {
+export interface User {
   id: string;
   name: string;
   email: string;
   role: Role;
   loginId: string;
   position: string;
+  permissions: string[];
 }
 
 interface AuthState {
-  user: MockUser | null;
+  user: User | null;
   token: string | null;
   isAuthenticated: boolean;
-  login: (role?: Role) => void;
+  login: (credentials: any) => Promise<void>;
+  register: (data: any) => Promise<void>;
   logout: () => void;
   switchRole: (role: Role) => void;
 }
-
-// ─── Mock Data ──────────────────────────────────────────────────
-
-const MOCK_USER: MockUser = {
-  id: '1',
-  name: 'Admin User',
-  email: 'admin@shivfurniture.com',
-  role: ROLE.ADMIN,
-  loginId: 'admin001',
-  position: 'System Administrator',
-};
 
 // ─── Context ────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<MockUser | null>(MOCK_USER);
-  const [token, setToken] = useState<string | null>('mock-jwt-token');
+  const [user, setUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('auth_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem('access_token') || null;
+  });
 
-  const login = (role?: Role) => {
-    const loginUser = { ...MOCK_USER, role: role ?? ROLE.ADMIN };
-    setUser(loginUser);
-    setToken('mock-jwt-token');
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('auth_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('auth_user');
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (token) {
+      localStorage.setItem('access_token', token);
+    } else {
+      localStorage.removeItem('access_token');
+    }
+  }, [token]);
+
+  const login = async (credentials: any) => {
+    const res = await api.post('/auth/login', credentials);
+    const { accessToken, user: userData } = res.data.data;
+    setToken(accessToken);
+    setUser({
+      ...userData,
+      role: ROLE.ADMIN, // Default to admin for the simulator, you'd normally derive this
+      email: userData.email || '',
+      position: 'Staff',
+      loginId: credentials.loginId,
+    });
+  };
+
+  const register = async (data: any) => {
+    await api.post('/auth/register', data);
+    // Auto login after register
+    await login({ loginId: data.loginId, password: data.password });
   };
 
   const logout = () => {
+    // Optionally call backend logout
+    api.post('/auth/logout').catch(() => {});
     setUser(null);
     setToken(null);
   };
@@ -65,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token,
         isAuthenticated: !!token,
         login,
+        register,
         logout,
         switchRole,
       }}
