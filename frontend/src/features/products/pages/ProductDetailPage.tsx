@@ -39,8 +39,8 @@ export default function ProductDetailPage() {
   }
 
   // ─── RBAC Checks ─────────────────────────────────────────────────
-  const canEdit = hasPermission(user?.role, MODULE.PRODUCTS, PERMISSION_ACTION.ADMIN);
-  const canAdjustStock = hasPermission(user?.role, MODULE.INVENTORY, PERMISSION_ACTION.ADMIN);
+  const canEdit = hasPermission(user?.permissions, MODULE.PRODUCTS, PERMISSION_ACTION.ADMIN);
+  const canAdjustStock = hasPermission(user?.permissions, MODULE.INVENTORY, PERMISSION_ACTION.ADMIN);
 
   // ─── Handlers ────────────────────────────────────────────────────
   const handleUpdate = (data: ProductFormData) => {

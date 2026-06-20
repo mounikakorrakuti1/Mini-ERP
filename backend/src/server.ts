@@ -30,8 +30,12 @@ app.use(rateLimit({ windowMs: 60_000, max: 120 }));
 const ok = (res: express.Response, data: any, status = 200) =>
   res.status(status).json({ success: true, data });
 const body = (schema: z.ZodTypeAny) => (req: any, _res: any, next: any) => {
-  req.body = schema.parse(req.body);
-  next();
+  try {
+    req.body = schema.parse(req.body);
+    next();
+  } catch (err: any) {
+    next(new AppError(400, err.errors ? err.errors[0].message : 'Validation failed'));
+  }
 };
 const id = z.string().uuid();
 const items = z
@@ -82,11 +86,11 @@ app.post(
       email: z.string().email(),
       password: z
         .string()
-        .min(8)
-        .regex(/[A-Z]/)
-        .regex(/[a-z]/)
-        .regex(/[^A-Za-z0-9]/),
-      name: z.string().min(1),
+        .min(8, 'Password must be at least 8 characters')
+        .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+        .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+        .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+      name: z.string().min(1, 'Name is required'),
     }),
   ),
   asyncHandler(async (req, res) => {
@@ -116,7 +120,7 @@ app.post(
     });
     if (!user || !user.active || !(await bcrypt.compare(req.body.password, user.passwordHash)))
       throw new AppError(401, 'Invalid Login Id or Password');
-    const permissions = user.roles.flatMap((x) => x.role.permissions.map((p) => p.permission.code));
+    const permissions = user.roles.flatMap((x) => x.role.permissions.map((p) => ({ module: p.permission.module, accessLevel: p.accessLevel })));
     const token = jwt.sign({ sub: user.id, permissions }, process.env.JWT_SECRET!, {
       expiresIn: '15m',
     });
@@ -156,13 +160,13 @@ const master = (
   app.get(
     path,
     authenticate,
-    requirePermission(permission),
+    requirePermission(module.toUpperCase(), 'VIEW'),
     asyncHandler(async (_q, r) => ok(r, await model.findMany())),
   );
   app.post(
     path,
     authenticate,
-    requirePermission(permission),
+    requirePermission(module.toUpperCase(), 'ADMIN'),
     asyncHandler(async (q, r) =>
       ok(
         r,
@@ -188,7 +192,7 @@ const master = (
   app.patch(
     `${path}/:id`,
     authenticate,
-    requirePermission(permission),
+    requirePermission(module.toUpperCase(), 'ADMIN'),
     asyncHandler(async (q, r) =>
       ok(
         r,
@@ -220,20 +224,20 @@ master(
   '/customers',
   { ...prisma.customer, name: 'customer' },
   'MANAGE_CUSTOMERS',
-  'CUSTOMER',
+  'CUSTOMERS',
   'Customer',
 );
-master('/vendors', { ...prisma.vendor, name: 'vendor' }, 'MANAGE_VENDORS', 'VENDOR', 'Vendor');
+master('/vendors', { ...prisma.vendor, name: 'vendor' }, 'MANAGE_VENDORS', 'VENDORS', 'Vendor');
 app.get(
   '/products',
   authenticate,
-  requirePermission('VIEW_PRODUCTS'),
+  requirePermission('PRODUCTS', 'VIEW'),
   asyncHandler(async (_q, r) => ok(r, await prisma.product.findMany({ where: { active: true } }))),
 );
 app.post(
   '/products',
   authenticate,
-  requirePermission('MANAGE_PRODUCTS'),
+  requirePermission('PRODUCTS', 'ADMIN'),
   asyncHandler(async (q, r) => {
     const d = q.body;
     if (
@@ -269,7 +273,7 @@ app.post(
 app.patch(
   '/products/:id',
   authenticate,
-  requirePermission('MANAGE_PRODUCTS'),
+  requirePermission('PRODUCTS', 'ADMIN'),
   asyncHandler(async (q, r) =>
     ok(
       r,
@@ -298,7 +302,7 @@ app.patch(
 app.post(
   '/products/:id/adjust-stock',
   authenticate,
-  requirePermission('ADJUST_INVENTORY'),
+  requirePermission('INVENTORY', 'ADMIN'),
   body(
     z.object({
       direction: z.nativeEnum(StockDirection),
@@ -327,7 +331,7 @@ app.post(
 app.post(
   '/sales-orders',
   authenticate,
-  requirePermission('CREATE_SALES_ORDER'),
+  requirePermission('SALES_ORDERS', 'ADMIN'),
   body(
     z.object({
       customerId: id,
@@ -394,7 +398,7 @@ app.get(
 app.get(
   '/sales-orders',
   authenticate,
-  requirePermission('VIEW_SALES_ORDER'),
+  requirePermission('SALES_ORDERS', 'VIEW'),
   asyncHandler(async (q, r) =>
     ok(
       r,
@@ -409,7 +413,7 @@ app.get(
 app.get(
   '/sales-orders/:id',
   authenticate,
-  requirePermission('VIEW_SALES_ORDER'),
+  requirePermission('SALES_ORDERS', 'VIEW'),
   asyncHandler(async (q, r) =>
     ok(
       r,
@@ -423,7 +427,7 @@ app.get(
 app.patch(
   '/sales-orders/:id',
   authenticate,
-  requirePermission('CREATE_SALES_ORDER'),
+  requirePermission('SALES_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) =>
     ok(r, await ordersService.updateSales(q.user!.sub, q.params.id, q.body)),
   ),
@@ -431,13 +435,13 @@ app.patch(
 app.patch(
   '/sales-orders/:id/confirm',
   authenticate,
-  requirePermission('CONFIRM_SALES_ORDER'),
+  requirePermission('SALES_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) => ok(r, await ordersService.confirmSales(q.user!.sub, q.params.id))),
 );
 app.patch(
   '/sales-orders/:id/deliver',
   authenticate,
-  requirePermission('DELIVER_SALES_ORDER'),
+  requirePermission('SALES_ORDERS', 'ADMIN'),
   body(
     z.object({
       items: z.array(z.object({ itemId: id, deliveredQty: z.coerce.number().nonnegative() })),
@@ -450,20 +454,20 @@ app.patch(
 app.patch(
   '/sales-orders/:id/cancel',
   authenticate,
-  requirePermission('CONFIRM_SALES_ORDER'),
+  requirePermission('SALES_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) => ok(r, await ordersService.cancelSales(q.user!.sub, q.params.id))),
 );
 app.post(
   '/purchase-orders',
   authenticate,
-  requirePermission('CREATE_PURCHASE_ORDER'),
+  requirePermission('PURCHASE_ORDERS', 'ADMIN'),
   body(z.object({ vendorId: id, vendorAddress: z.string().optional(), expectedReceiptDate: dateField, items })),
   asyncHandler(async (q, r) => ok(r, await ordersService.createPurchase(q.user!.sub, q.body), 201)),
 );
 app.get(
   '/purchase-orders',
   authenticate,
-  requirePermission('VIEW_PURCHASE_ORDER'),
+  requirePermission('PURCHASE_ORDERS', 'VIEW'),
   asyncHandler(async (_q, r) =>
     ok(r, await prisma.purchaseOrder.findMany({ include: { items: true, vendor: true }, orderBy: { createdAt: 'desc' } })),
   ),
@@ -471,7 +475,7 @@ app.get(
 app.get(
   '/purchase-orders/:id',
   authenticate,
-  requirePermission('VIEW_PURCHASE_ORDER'),
+  requirePermission('PURCHASE_ORDERS', 'VIEW'),
   asyncHandler(async (q, r) =>
     ok(r, await prisma.purchaseOrder.findUniqueOrThrow({ where: { id: q.params.id }, include: { items: { include: { product: true } }, vendor: true } })),
   ),
@@ -479,7 +483,7 @@ app.get(
 app.patch(
   '/purchase-orders/:id',
   authenticate,
-  requirePermission('CREATE_PURCHASE_ORDER'),
+  requirePermission('PURCHASE_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) =>
     ok(r, await ordersService.updatePurchase(q.user!.sub, q.params.id, q.body)),
   ),
@@ -487,7 +491,7 @@ app.patch(
 app.patch(
   '/purchase-orders/:id/confirm',
   authenticate,
-  requirePermission('CONFIRM_PURCHASE_ORDER'),
+  requirePermission('PURCHASE_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) =>
     ok(r, await ordersService.confirmPurchase(q.user!.sub, q.params.id)),
   ),
@@ -495,7 +499,7 @@ app.patch(
 app.patch(
   '/purchase-orders/:id/receive',
   authenticate,
-  requirePermission('RECEIVE_PURCHASE_ORDER'),
+  requirePermission('PURCHASE_ORDERS', 'ADMIN'),
   body(
     z.object({
       items: z.array(z.object({ itemId: id, receivedQty: z.coerce.number().nonnegative() })),
@@ -508,13 +512,13 @@ app.patch(
 app.patch(
   '/purchase-orders/:id/cancel',
   authenticate,
-  requirePermission('CONFIRM_PURCHASE_ORDER'),
+  requirePermission('PURCHASE_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) => ok(r, await ordersService.cancelPurchase(q.user!.sub, q.params.id))),
 );
 app.get(
   '/bom',
   authenticate,
-  requirePermission('VIEW_BOM'),
+  requirePermission('BOM', 'VIEW'),
   asyncHandler(async (_q, r) =>
     ok(r, await prisma.bom.findMany({ include: { items: { include: { product: true } }, operations: true, finishedProduct: true }, orderBy: { createdAt: 'desc' } })),
   ),
@@ -522,7 +526,7 @@ app.get(
 app.get(
   '/bom/:id',
   authenticate,
-  requirePermission('VIEW_BOM'),
+  requirePermission('BOM', 'VIEW'),
   asyncHandler(async (q, r) =>
     ok(r, await prisma.bom.findUniqueOrThrow({ where: { id: q.params.id }, include: { items: { include: { product: true } }, operations: true, finishedProduct: true } })),
   ),
@@ -530,7 +534,7 @@ app.get(
 app.post(
   '/bom',
   authenticate,
-  requirePermission('EDIT_BOM'),
+  requirePermission('BOM', 'ADMIN'),
   asyncHandler(async (q, r) =>
     ok(
       r,
@@ -566,7 +570,7 @@ app.post(
 app.patch(
   '/bom/:id',
   authenticate,
-  requirePermission('EDIT_BOM'),
+  requirePermission('BOM', 'ADMIN'),
   asyncHandler(async (q, r) =>
     ok(
       r,
@@ -613,13 +617,13 @@ app.patch(
 app.post(
   '/manufacturing-orders',
   authenticate,
-  requirePermission('CREATE_MANUFACTURING_ORDER'),
+  requirePermission('MANUFACTURING_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) => ok(r, await ordersService.createMo(q.user!.sub, q.body), 201)),
 );
 app.get(
   '/manufacturing-orders',
   authenticate,
-  requirePermission('VIEW_MANUFACTURING_ORDER'),
+  requirePermission('MANUFACTURING_ORDERS', 'VIEW'),
   asyncHandler(async (_q, r) =>
     ok(r, await prisma.manufacturingOrder.findMany({ include: { items: { include: { product: true } }, workOrders: true, finishedProduct: true, bom: true }, orderBy: { createdAt: 'desc' } })),
   ),
@@ -627,7 +631,7 @@ app.get(
 app.get(
   '/manufacturing-orders/:id',
   authenticate,
-  requirePermission('VIEW_MANUFACTURING_ORDER'),
+  requirePermission('MANUFACTURING_ORDERS', 'VIEW'),
   asyncHandler(async (q, r) =>
     ok(r, await prisma.manufacturingOrder.findUniqueOrThrow({ where: { id: q.params.id }, include: { items: { include: { product: true } }, workOrders: true, finishedProduct: true, bom: true } })),
   ),
@@ -635,7 +639,7 @@ app.get(
 app.patch(
   '/manufacturing-orders/:id',
   authenticate,
-  requirePermission('CREATE_MANUFACTURING_ORDER'),
+  requirePermission('MANUFACTURING_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) =>
     ok(r, await ordersService.updateMo(q.user!.sub, q.params.id, q.body)),
   ),
@@ -643,31 +647,31 @@ app.patch(
 app.patch(
   '/manufacturing-orders/:id/confirm',
   authenticate,
-  requirePermission('CONFIRM_MANUFACTURING_ORDER'),
+  requirePermission('MANUFACTURING_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) => ok(r, await ordersService.confirmMo(q.user!.sub, q.params.id))),
 );
 app.patch(
   '/manufacturing-orders/:id/start',
   authenticate,
-  requirePermission('START_MANUFACTURING_ORDER'),
+  requirePermission('MANUFACTURING_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) => ok(r, await ordersService.startMo(q.user!.sub, q.params.id))),
 );
 app.patch(
   '/manufacturing-orders/:id/complete',
   authenticate,
-  requirePermission('COMPLETE_MANUFACTURING_ORDER'),
+  requirePermission('MANUFACTURING_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) => ok(r, await ordersService.completeMo(q.user!.sub, q.params.id))),
 );
 app.patch(
   '/manufacturing-orders/:id/cancel',
   authenticate,
-  requirePermission('CONFIRM_MANUFACTURING_ORDER'),
+  requirePermission('MANUFACTURING_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) => ok(r, await ordersService.cancelMo(q.user!.sub, q.params.id))),
 );
 app.get(
   '/inventory/summary',
   authenticate,
-  requirePermission('VIEW_INVENTORY'),
+  requirePermission('INVENTORY', 'VIEW'),
   asyncHandler(async (_q, r) => {
     const products = await prisma.product.findMany({ where: { active: true } });
     ok(
@@ -683,7 +687,7 @@ app.get(
 app.get(
   '/inventory/movements',
   authenticate,
-  requirePermission('VIEW_INVENTORY'),
+  requirePermission('INVENTORY', 'VIEW'),
   asyncHandler(async (_q, r) =>
     ok(r, await prisma.stockMovement.findMany({ orderBy: { createdAt: 'desc' }, take: 500 })),
   ),
@@ -691,7 +695,7 @@ app.get(
 app.get(
   '/inventory/reconciliation',
   authenticate,
-  requirePermission('VIEW_INVENTORY'),
+  requirePermission('INVENTORY', 'VIEW'),
   asyncHandler(async (_q, r) => {
     const [products, movementSums] = await Promise.all([
       prisma.product.findMany({ where: { active: true } }),
@@ -719,7 +723,7 @@ app.get(
 app.get(
   '/traceability/sales-order/:id',
   authenticate,
-  requirePermission('VIEW_SALES_ORDER'),
+  requirePermission('SALES_ORDERS', 'VIEW'),
   asyncHandler(async (q, r) => {
     const salesOrder = await prisma.salesOrder.findUniqueOrThrow({
       where: { id: q.params.id },
@@ -774,7 +778,7 @@ app.get(
 app.get(
   '/audit-logs',
   authenticate,
-  requirePermission('VIEW_AUDIT_LOGS'),
+  requirePermission('AUDIT_LOGS', 'VIEW'),
   asyncHandler(async (_q, r) =>
     ok(r, await prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 500 })),
   ),
@@ -813,6 +817,67 @@ app.patch(
       }),
     ),
   ),
+);
+app.get(
+  '/admin/roles',
+  authenticate,
+  requirePermission('USER_MANAGEMENT', 'VIEW'),
+  asyncHandler(async (_q, r) => ok(r, await prisma.role.findMany()))
+);
+app.get(
+  '/admin/users',
+  authenticate,
+  requirePermission('USER_MANAGEMENT', 'VIEW'),
+  asyncHandler(async (_q, r) => {
+    const users = await prisma.user.findMany({
+      include: { roles: { include: { role: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+    ok(r, users);
+  })
+);
+app.patch(
+  '/admin/users/:id',
+  authenticate,
+  requirePermission('USER_MANAGEMENT', 'ADMIN'),
+  body(z.object({
+    position: z.string().optional().nullable(),
+    active: z.boolean().optional(),
+    roleId: z.string().uuid().optional().nullable(),
+  })),
+  asyncHandler(async (q, r) => {
+    const { position, active, roleId } = q.body;
+    const user = await prisma.$transaction(async (tx) => {
+      const dataToUpdate: any = {};
+      if (position !== undefined) dataToUpdate.position = position;
+      if (active !== undefined) dataToUpdate.active = active;
+      
+      const u = await tx.user.update({
+        where: { id: q.params.id },
+        data: dataToUpdate,
+      });
+      
+      if (roleId !== undefined) {
+        await tx.userRole.deleteMany({ where: { userId: q.params.id } });
+        if (roleId) {
+          await tx.userRole.create({ data: { userId: q.params.id, roleId } });
+        }
+      }
+      
+      await tx.auditLog.create({
+        data: {
+          actorId: q.user!.sub,
+          module: 'AUTH',
+          recordType: 'User',
+          recordId: u.id,
+          action: 'UPDATE',
+        },
+      });
+      
+      return u;
+    });
+    ok(r, user);
+  })
 );
 app.use(errorHandler);
 app.listen(Number(process.env.PORT || 3000), () => console.log('Mini ERP API listening'));

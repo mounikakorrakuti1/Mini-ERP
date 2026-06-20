@@ -58,6 +58,10 @@ enum AuditAction {
   INVENTORY_CHANGE
 }
 
+enum AccessLevel {
+  ADMIN
+  VIEW
+}
 model User {
   id String @id @default(uuid())
   loginId String @unique
@@ -86,7 +90,7 @@ model Role {
 }
 model Permission {
   id String @id @default(uuid())
-  code String @unique
+  module String @unique
   description String?
   roles RolePermission[]
   @@map("permissions")
@@ -102,6 +106,7 @@ model UserRole {
 model RolePermission {
   roleId String
   permissionId String
+  accessLevel AccessLevel
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   @@id([roleId, permissionId])

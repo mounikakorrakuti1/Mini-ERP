@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/store/auth.store';
+import { hasPermission } from '@/lib/permissions';
+import { MODULE, PERMISSION_ACTION } from '@/types/enums';
 import { useDb } from '@/store/db.store';
 import { ROLE } from '@/types/enums';
 import type { Role } from '@/types/enums';
@@ -12,7 +14,7 @@ import { ROUTES } from '@/routes/routeMap';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { user, switchRole } = useAuthStore();
+  const { user } = useAuthStore();
   const { products, stockMovements } = useDb();
 
   // ─── Dynamic Metrics derived from DB Store ───────────────────────
@@ -33,39 +35,15 @@ export default function DashboardPage() {
     { label: 'Total Stock Actions', value: stockMovements.length.toString(), trend: 'Movements logged', isPositive: true, icon: Activity, color: 'var(--status-success)' },
   ];
 
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    switchRole(e.target.value as Role);
-  };
-
   return (
     <div className="dashboard" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-      {/* Top Header with Interactive Role Switcher */}
+      {/* Top Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
         <div>
           <h1 className="h1">Dashboard Overview</h1>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Welcome back, <strong>{user?.name}</strong>. Current simulated workspace: <strong>{user?.role?.replace(/_/g, ' ')}</strong>.
+            Welcome back, <strong>{user?.name}</strong>. Position: <strong>{user?.position || 'Staff'}</strong>.
           </p>
-        </div>
-
-        {/* Interactive Role Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
-          <label className="input-label" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-            Switch Simulated Role:
-          </label>
-          <select
-            className="input-field"
-            value={user?.role}
-            onChange={handleRoleChange}
-            style={{ appearance: 'auto', padding: 'var(--space-micro) var(--space-sm)', fontSize: 'var(--text-sm)', minWidth: '180px' }}
-          >
-            <option value={ROLE.ADMIN}>Administrator</option>
-            <option value={ROLE.BUSINESS_OWNER}>Business Owner</option>
-            <option value={ROLE.INVENTORY_MANAGER}>Inventory Manager</option>
-            <option value={ROLE.SALES_USER}>Sales User</option>
-            <option value={ROLE.PURCHASE_USER}>Purchase User</option>
-            <option value={ROLE.MANUFACTURING_USER}>Manufacturing User</option>
-          </select>
         </div>
       </div>
 
@@ -87,7 +65,7 @@ export default function DashboardPage() {
       {/* ─── ROLE BASED WIDGETS SECTION ───────────────────────────────── */}
 
       {/* 1. ADMIN DASHBOARD VIEW */}
-      {user?.role === ROLE.ADMIN && (
+      {hasPermission(user?.permissions, MODULE.AUDIT_LOGS, PERMISSION_ACTION.VIEW) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
           {/* Reconciliation Health Banner */}
           {reconciliationMismatches.length === 0 ? (
@@ -190,7 +168,7 @@ export default function DashboardPage() {
       )}
 
       {/* 2. INVENTORY MANAGER DASHBOARD VIEW */}
-      {user?.role === ROLE.INVENTORY_MANAGER && (
+      {hasPermission(user?.permissions, MODULE.INVENTORY, PERMISSION_ACTION.ADMIN) && !hasPermission(user?.permissions, MODULE.AUDIT_LOGS, PERMISSION_ACTION.VIEW) && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--space-md)' }}>
           {/* Main layout */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--space-md)' }}>
@@ -305,7 +283,7 @@ export default function DashboardPage() {
       )}
 
       {/* 3. BUSINESS OWNER DASHBOARD VIEW */}
-      {user?.role === ROLE.BUSINESS_OWNER && (
+      {hasPermission(user?.permissions, MODULE.VENDORS, PERMISSION_ACTION.VIEW) && hasPermission(user?.permissions, MODULE.PRODUCTS, PERMISSION_ACTION.ADMIN) && !hasPermission(user?.permissions, MODULE.AUDIT_LOGS, PERMISSION_ACTION.VIEW) && !hasPermission(user?.permissions, MODULE.INVENTORY, PERMISSION_ACTION.ADMIN) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--space-md)' }}>
             
@@ -386,13 +364,13 @@ export default function DashboardPage() {
       )}
 
       {/* 4. DEFAULT COMPLEMENTARY MSG FOR SPECIALIZED OPERATIONAL USERS */}
-      {(user?.role === ROLE.SALES_USER || user?.role === ROLE.PURCHASE_USER || user?.role === ROLE.MANUFACTURING_USER) && (
+      {(!hasPermission(user?.permissions, MODULE.AUDIT_LOGS, PERMISSION_ACTION.VIEW) && !hasPermission(user?.permissions, MODULE.INVENTORY, PERMISSION_ACTION.ADMIN) && !hasPermission(user?.permissions, MODULE.PRODUCTS, PERMISSION_ACTION.ADMIN)) && (
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', padding: 'var(--space-md)' }}>
           <Users size={24} color="var(--accent-main)" />
           <div>
             <h4 className="text-md">Operational Workflow View</h4>
             <p className="text-xs" style={{ color: 'var(--text-muted)', marginTop: '2px' }}>
-              Your role <strong>{user?.role?.replace(/_/g, ' ')}</strong> is assigned to specialized transactional screens. You can review core catalog listings in the sidebar or use the simulator above to switch roles.
+              Your account is assigned to specialized transactional screens. You can review core catalog listings in the sidebar.
             </p>
           </div>
         </div>

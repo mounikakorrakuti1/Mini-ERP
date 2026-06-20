@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import { ROLE } from '@/types/enums';
 import type { Role } from '@/types/enums';
 import { api } from '@/lib/api';
+import type { DynamicPermission } from '@/lib/permissions';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -12,7 +13,7 @@ export interface User {
   role: Role;
   loginId: string;
   position: string;
-  permissions: string[];
+  permissions: DynamicPermission[];
 }
 
 interface AuthState {
@@ -60,9 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(accessToken);
     setUser({
       ...userData,
-      role: ROLE.ADMIN, // Default to admin for the simulator, you'd normally derive this
       email: userData.email || '',
-      position: 'Staff',
+      position: userData.position || 'Staff',
       loginId: credentials.loginId,
     });
   };
@@ -80,11 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
   };
 
-  const switchRole = (role: Role) => {
-    if (user) {
-      setUser({ ...user, role });
-    }
-  };
 
   return (
     <AuthContext.Provider
@@ -95,7 +90,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
-        switchRole,
       }}
     >
       {children}

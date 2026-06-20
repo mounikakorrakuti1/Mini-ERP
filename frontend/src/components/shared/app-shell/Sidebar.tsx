@@ -45,7 +45,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user } = useAuthStore();
 
   const filteredItems = NAV_ITEMS.filter((item) =>
-    hasPermission(user?.role, item.module, PERMISSION_ACTION.VIEW)
+    hasPermission(user?.permissions, item.module, PERMISSION_ACTION.VIEW)
   );
 
   return (

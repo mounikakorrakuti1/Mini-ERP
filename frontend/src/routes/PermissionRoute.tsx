@@ -17,7 +17,7 @@ interface PermissionRouteProps {
  */
 export function PermissionRoute({ module, action, children }: PermissionRouteProps) {
   const { user } = useAuthStore();
-  const can = hasPermission(user?.role, module, action);
+  const can = hasPermission(user?.permissions, module, action);
 
   if (!can) {
     return <Navigate to={ROUTES.DASHBOARD} replace />;

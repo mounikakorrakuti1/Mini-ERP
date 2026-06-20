@@ -10,29 +10,9 @@ import {
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
-const permissions = [
-  'VIEW_PRODUCTS',
-  'MANAGE_PRODUCTS',
-  'MANAGE_CUSTOMERS',
-  'MANAGE_VENDORS',
-  'ADJUST_INVENTORY',
-  'CREATE_SALES_ORDER',
-  'VIEW_SALES_ORDER',
-  'CONFIRM_SALES_ORDER',
-  'DELIVER_SALES_ORDER',
-  'CREATE_PURCHASE_ORDER',
-  'VIEW_PURCHASE_ORDER',
-  'CONFIRM_PURCHASE_ORDER',
-  'RECEIVE_PURCHASE_ORDER',
-  'VIEW_BOM',
-  'EDIT_BOM',
-  'CREATE_MANUFACTURING_ORDER',
-  'VIEW_MANUFACTURING_ORDER',
-  'CONFIRM_MANUFACTURING_ORDER',
-  'START_MANUFACTURING_ORDER',
-  'COMPLETE_MANUFACTURING_ORDER',
-  'VIEW_INVENTORY',
-  'VIEW_AUDIT_LOGS',
+const modulesList = [
+  'PRODUCTS', 'SALES_ORDERS', 'PURCHASE_ORDERS', 'MANUFACTURING_ORDERS',
+  'BOM', 'VENDORS', 'CUSTOMERS', 'INVENTORY', 'AUDIT_LOGS', 'USER_MANAGEMENT', 'DASHBOARDS'
 ];
 
 async function main() {
@@ -61,85 +41,98 @@ async function main() {
     await tx.role.deleteMany();
     await tx.user.deleteMany();
 
-    const adminRole = await tx.role.create({
-      data: { name: 'Admin', description: 'Full system access' },
-    });
-    const salesRole = await tx.role.create({
-      data: { name: 'Sales User', description: 'Sales order operator' },
-    });
-    const purchaseRole = await tx.role.create({
-      data: { name: 'Purchase User', description: 'Purchase order operator' },
-    });
-    const createdPermissions = await Promise.all(
-      permissions.map((code) => tx.permission.create({ data: { code } })),
-    );
-    await Promise.all(
-      createdPermissions.map((permission) =>
-        tx.rolePermission.create({ data: { roleId: adminRole.id, permissionId: permission.id } }),
-      ),
-    );
-    for (const code of [
-      'VIEW_PRODUCTS',
-      'CREATE_SALES_ORDER',
-      'VIEW_SALES_ORDER',
-      'CONFIRM_SALES_ORDER',
-      'DELIVER_SALES_ORDER',
-    ]) {
-      await tx.rolePermission.create({
-        data: {
-          roleId: salesRole.id,
-          permissionId: createdPermissions.find((p) => p.code === code)!.id,
-        },
-      });
+    const roles = {
+      admin: await tx.role.create({ data: { name: 'Admin', description: 'Full system access' } }),
+      owner: await tx.role.create({ data: { name: 'Business Owner', description: 'Business Owner' } }),
+      sales: await tx.role.create({ data: { name: 'Sales User', description: 'Sales order operator' } }),
+      purchase: await tx.role.create({ data: { name: 'Purchase User', description: 'Purchase order operator' } }),
+      mfg: await tx.role.create({ data: { name: 'Manufacturing User', description: 'Manufacturing operator' } }),
+      inventory: await tx.role.create({ data: { name: 'Inventory Manager', description: 'Inventory Manager' } }),
+    };
+
+    const perms: Record<string, any> = {};
+    for (const m of modulesList) {
+      perms[m] = await tx.permission.create({ data: { module: m } });
     }
-    for (const code of [
-      'VIEW_PRODUCTS',
-      'CREATE_PURCHASE_ORDER',
-      'VIEW_PURCHASE_ORDER',
-      'CONFIRM_PURCHASE_ORDER',
-      'RECEIVE_PURCHASE_ORDER',
-    ]) {
+
+    const matrix = [
+      { role: roles.admin, module: perms.PRODUCTS, level: 'ADMIN' },
+      { role: roles.admin, module: perms.SALES_ORDERS, level: 'ADMIN' },
+      { role: roles.admin, module: perms.PURCHASE_ORDERS, level: 'ADMIN' },
+      { role: roles.admin, module: perms.MANUFACTURING_ORDERS, level: 'ADMIN' },
+      { role: roles.admin, module: perms.BOM, level: 'ADMIN' },
+      { role: roles.admin, module: perms.VENDORS, level: 'ADMIN' },
+      { role: roles.admin, module: perms.CUSTOMERS, level: 'ADMIN' },
+      { role: roles.admin, module: perms.INVENTORY, level: 'ADMIN' },
+      { role: roles.admin, module: perms.AUDIT_LOGS, level: 'ADMIN' },
+      { role: roles.admin, module: perms.USER_MANAGEMENT, level: 'ADMIN' },
+      { role: roles.admin, module: perms.DASHBOARDS, level: 'ADMIN' },
+
+      { role: roles.owner, module: perms.PRODUCTS, level: 'ADMIN' },
+      { role: roles.owner, module: perms.SALES_ORDERS, level: 'VIEW' },
+      { role: roles.owner, module: perms.PURCHASE_ORDERS, level: 'VIEW' },
+      { role: roles.owner, module: perms.MANUFACTURING_ORDERS, level: 'VIEW' },
+      { role: roles.owner, module: perms.BOM, level: 'VIEW' },
+      { role: roles.owner, module: perms.VENDORS, level: 'VIEW' },
+      { role: roles.owner, module: perms.CUSTOMERS, level: 'VIEW' },
+      { role: roles.owner, module: perms.INVENTORY, level: 'VIEW' },
+      { role: roles.owner, module: perms.DASHBOARDS, level: 'ADMIN' },
+
+      { role: roles.sales, module: perms.PRODUCTS, level: 'VIEW' },
+      { role: roles.sales, module: perms.SALES_ORDERS, level: 'ADMIN' },
+      { role: roles.sales, module: perms.CUSTOMERS, level: 'ADMIN' },
+      { role: roles.sales, module: perms.INVENTORY, level: 'VIEW' },
+      { role: roles.sales, module: perms.DASHBOARDS, level: 'VIEW' },
+
+      { role: roles.purchase, module: perms.PRODUCTS, level: 'VIEW' },
+      { role: roles.purchase, module: perms.PURCHASE_ORDERS, level: 'ADMIN' },
+      { role: roles.purchase, module: perms.VENDORS, level: 'ADMIN' },
+      { role: roles.purchase, module: perms.INVENTORY, level: 'VIEW' },
+      { role: roles.purchase, module: perms.DASHBOARDS, level: 'VIEW' },
+
+      { role: roles.mfg, module: perms.PRODUCTS, level: 'VIEW' },
+      { role: roles.mfg, module: perms.MANUFACTURING_ORDERS, level: 'ADMIN' },
+      { role: roles.mfg, module: perms.BOM, level: 'ADMIN' },
+      { role: roles.mfg, module: perms.INVENTORY, level: 'VIEW' },
+      { role: roles.mfg, module: perms.DASHBOARDS, level: 'VIEW' },
+
+      { role: roles.inventory, module: perms.PRODUCTS, level: 'VIEW' },
+      { role: roles.inventory, module: perms.SALES_ORDERS, level: 'VIEW' },
+      { role: roles.inventory, module: perms.PURCHASE_ORDERS, level: 'VIEW' },
+      { role: roles.inventory, module: perms.MANUFACTURING_ORDERS, level: 'VIEW' },
+      { role: roles.inventory, module: perms.BOM, level: 'VIEW' },
+      { role: roles.inventory, module: perms.VENDORS, level: 'VIEW' },
+      { role: roles.inventory, module: perms.INVENTORY, level: 'ADMIN' },
+      { role: roles.inventory, module: perms.DASHBOARDS, level: 'VIEW' },
+    ];
+
+    for (const m of matrix) {
       await tx.rolePermission.create({
         data: {
-          roleId: purchaseRole.id,
-          permissionId: createdPermissions.find((p) => p.code === code)!.id,
-        },
+          roleId: m.role.id,
+          permissionId: m.module.id,
+          accessLevel: m.level as any
+        }
       });
     }
 
     const passwordHash = await bcrypt.hash('Admin@123', 12);
-    const admin = await tx.user.create({
-      data: {
-        loginId: 'admin01',
-        email: 'admin@shivfurniture.local',
-        name: 'System Admin',
-        position: 'Administrator',
-        passwordHash,
-      },
-    });
-    const salesUser = await tx.user.create({
-      data: {
-        loginId: 'sales01',
-        email: 'sales@shivfurniture.local',
-        name: 'Anita Sales',
-        position: 'Sales Executive',
-        passwordHash,
-      },
-    });
-    const buyer = await tx.user.create({
-      data: {
-        loginId: 'buyer01',
-        email: 'buyer@shivfurniture.local',
-        name: 'Rahul Buyer',
-        position: 'Purchase Executive',
-        passwordHash,
-      },
-    });
+    
+    const admin = await tx.user.create({ data: { loginId: 'admin01', email: 'admin@shivfurniture.local', name: 'System Admin', position: 'Administrator', passwordHash } });
+    const owner = await tx.user.create({ data: { loginId: 'owner01', email: 'owner@shivfurniture.local', name: 'Business Owner', position: 'Owner', passwordHash } });
+    const salesUser = await tx.user.create({ data: { loginId: 'sales01', email: 'sales@shivfurniture.local', name: 'Anita Sales', position: 'Sales Executive', passwordHash } });
+    const buyer = await tx.user.create({ data: { loginId: 'buyer01', email: 'buyer@shivfurniture.local', name: 'Rahul Buyer', position: 'Purchase Executive', passwordHash } });
+    const mfgUser = await tx.user.create({ data: { loginId: 'mfg01', email: 'mfg@shivfurniture.local', name: 'David Mfg', position: 'Factory Manager', passwordHash } });
+    const invUser = await tx.user.create({ data: { loginId: 'inv01', email: 'inv@shivfurniture.local', name: 'Sarah Inv', position: 'Inventory Manager', passwordHash } });
+
     await tx.userRole.createMany({
       data: [
-        { userId: admin.id, roleId: adminRole.id },
-        { userId: salesUser.id, roleId: salesRole.id },
-        { userId: buyer.id, roleId: purchaseRole.id },
+        { userId: admin.id, roleId: roles.admin.id },
+        { userId: owner.id, roleId: roles.owner.id },
+        { userId: salesUser.id, roleId: roles.sales.id },
+        { userId: buyer.id, roleId: roles.purchase.id },
+        { userId: mfgUser.id, roleId: roles.mfg.id },
+        { userId: invUser.id, roleId: roles.inventory.id },
       ],
     });
 

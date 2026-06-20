@@ -21,13 +21,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // If we are unauthorized, and not already on the login page
-      // we can clear token and reload or let the auth store handle it.
-      // For now, let's just clear the local storage.
       localStorage.removeItem('access_token');
       localStorage.removeItem('auth_user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      if (window.location.pathname !== '/auth/login') {
+        window.location.href = '/auth/login';
       }
     }
     return Promise.reject(error);

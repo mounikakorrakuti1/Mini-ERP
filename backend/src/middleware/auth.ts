@@ -17,19 +17,32 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
 }
 export const requirePermission =
-  (...needed: string[]) =>
+  (module: string, level: 'ADMIN' | 'VIEW' = 'ADMIN') =>
   async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user)
       return res.status(401).json({ success: false, message: 'Authentication required' });
+    
     let permissions = req.user.permissions || [];
     if (req.method !== 'GET') {
       const roles = await prisma.userRole.findMany({
         where: { userId: req.user.sub },
         include: { role: { include: { permissions: { include: { permission: true } } } } },
       });
-      permissions = roles.flatMap((x) => x.role.permissions.map((p) => p.permission.code));
+      permissions = roles.flatMap((x) => x.role.permissions.map((p) => ({
+        module: p.permission.module,
+        accessLevel: p.accessLevel
+      })));
     }
-    if (!needed.some((p) => permissions.includes(p)))
-      return res.status(403).json({ success: false, message: 'Forbidden' });
+    
+    const p = permissions.find((perm: any) => perm.module === module);
+    console.log(`[AUTH CHECK] req to ${req.originalUrl}. user: ${req.user.sub}, checking module: ${module}, level: ${level}. Found: ${JSON.stringify(p)}`);
+    
+    if (!p)
+      return res.status(403).json({ success: false, message: 'Forbidden: Missing module permission' });
+      
+    if (level === 'ADMIN' && p.accessLevel !== 'ADMIN')
+      return res.status(403).json({ success: false, message: 'Forbidden: Requires ADMIN access' });
+
     next();
   };
+

@@ -19,7 +19,7 @@ export default function ProductListPage() {
   const [sortAsc, setSortAsc] = useState(true);
 
   // ─── RBAC Authorization conveniency ──────────────────────────────
-  const canCreate = hasPermission(user?.role, MODULE.PRODUCTS, PERMISSION_ACTION.ADMIN);
+  const canCreate = hasPermission(user?.permissions, MODULE.PRODUCTS, PERMISSION_ACTION.ADMIN);
 
   // ─── Apply Filtering & Sorting ──────────────────────────────────
   const filteredProducts = products
