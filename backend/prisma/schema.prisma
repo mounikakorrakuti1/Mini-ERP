@@ -11,6 +11,11 @@ enum ProcurementType {
   PURCHASE
   MANUFACTURING
 }
+enum ProductCategory {
+  RAW_MATERIAL
+  FINISHED_GOOD
+  SERVICE
+}
 enum StockDirection {
   IN
   OUT
@@ -72,12 +77,25 @@ model User {
   mobile String?
   position String?
   active Boolean @default(true)
+  tokenVersion Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   roles UserRole[]
   audits AuditLog[]
   notifications Notification[]
+  passwordResetTokens PasswordResetToken[]
   @@map("users")
+}
+model PasswordResetToken {
+  id String @id @default(uuid())
+  userId String
+  tokenHash String @unique
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model Role {
@@ -138,6 +156,7 @@ model Product {
   id String @id @default(uuid())
   reference String @unique
   name String @unique
+  category ProductCategory @default(RAW_MATERIAL)
   salesPrice Decimal @db.Decimal(14, 2)
   costPrice Decimal @db.Decimal(14, 2)
   onHandQty Decimal @default(0) @db.Decimal(14, 3)
@@ -302,13 +321,15 @@ model InventoryReservation {
   salesOrderId String?
   manufacturingOrderId String?
   quantity Decimal @db.Decimal(14, 3)
+  active Boolean @default(true)
   createdAt DateTime @default(now())
+  releasedAt DateTime?
   product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
   salesOrder SalesOrder? @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
   manufacturingOrder ManufacturingOrder? @relation(fields: [manufacturingOrderId], references: [id], onDelete: Cascade)
-  @@unique([productId, salesOrderId])
-  @@unique([productId, manufacturingOrderId])
-  @@index([productId])
+  @@index([productId, active])
+  @@index([salesOrderId, active])
+  @@index([manufacturingOrderId, active])
   @@map("inventory_reservations")
 }
 model StockMovement {

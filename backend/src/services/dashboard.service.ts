@@ -90,7 +90,16 @@ export class DashboardService {
       this.averageProcurementLeadTime(db),
     ]);
     const moved = new Set(movedProducts.map((x) => x.productId));
-    const balances = await Promise.all(products.map(async (p) => ({ product: p, ...(await inventoryService.balances(db as Prisma.TransactionClient, p.id)) })));
+    const activeReservations = await db.inventoryReservation.groupBy({
+      by: ['productId'],
+      where: { active: true },
+      _sum: { quantity: true }
+    });
+    const reservedMap = new Map(activeReservations.map(r => [r.productId, Number(r._sum.quantity || 0)]));
+    const balances = products.map(p => {
+      const reserved = reservedMap.get(p.id) || 0;
+      return { product: p, onHand: Number(p.onHandQty), reserved, available: Number(p.onHandQty) - reserved };
+    });
     const lowStock = balances.filter((x) => x.available <= Math.max(Number(x.product.reorderPoint), Number(x.product.safetyStock)));
     const belowReorder = balances.filter((x) => x.available <= Number(x.product.reorderPoint));
     const noMovement = products.filter((p) => !moved.has(p.id));

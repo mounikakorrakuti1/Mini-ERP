@@ -11,7 +11,8 @@
     "demo:api": "tsx scripts/demo-api.ts",
     "demo:walkthrough": "tsx scripts/demo-walkthrough.ts",
     "format": "prettier . --write",
-    "test:e2e": "tsx --test src/__tests__/demand-to-delivery.integration.test.ts"
+    "test:e2e": "tsx --test src/__tests__/demand-to-delivery.integration.test.ts",
+    "test:coverage": "cross-env NODE_ENV=test c8 --all --include src/**/*.ts --exclude src/__tests__/** --reporter=lcov --reporter=text tsx --test --test-concurrency=1 src/__tests__/*.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -38,11 +39,15 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.15.29",
+    "@types/supertest": "^7.2.0",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
+    "c8": "^11.0.0",
+    "cross-env": "^10.1.0",
     "eslint": "^10.5.0",
     "prettier": "^3.8.4",
     "prisma": "^6.10.1",
+    "supertest": "^7.2.2",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }

@@ -9,7 +9,7 @@ export class InventoryService {
     const p = await tx.product.findUnique({ where: { id: productId } });
     if (!p) throw new AppError(404, 'Product not found');
     const r = await tx.inventoryReservation.aggregate({
-      where: { productId },
+      where: { productId, active: true },
       _sum: { quantity: true },
     });
     const reserved = Number(r._sum.quantity || 0);
@@ -29,13 +29,12 @@ export class InventoryService {
     const existing = await tx.inventoryReservation.findFirst({
       where: {
         productId,
+        active: true,
         salesOrderId: link.salesOrderId,
         manufacturingOrderId: link.manufacturingOrderId,
       },
     });
     if (existing) throw new AppError(409, 'Duplicate reservation detected');
-    const b = await this.balances(tx, productId);
-    if (b.available < quantity) throw new AppError(422, 'Insufficient available stock');
     return tx.inventoryReservation.create({
       data: {
         productId,
@@ -49,7 +48,23 @@ export class InventoryService {
     tx: Prisma.TransactionClient,
     where: { salesOrderId?: string; manufacturingOrderId?: string; productId?: string },
   ) {
-    return tx.inventoryReservation.deleteMany({ where });
+    return tx.inventoryReservation.updateMany({
+      where: { ...where, active: true },
+      data: { active: false, releasedAt: new Date() },
+    });
+  }
+  async replaceReservation(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    quantity: number,
+    link: { salesOrderId?: string; manufacturingOrderId?: string },
+  ) {
+    await this.lockProduct(tx, productId);
+    await this.releaseStock(tx, { productId, ...link });
+    if (quantity <= 0) return null;
+    return tx.inventoryReservation.create({
+      data: { productId, quantity, ...link },
+    });
   }
   async issueReservedStock(
     tx: Prisma.TransactionClient,
@@ -65,16 +80,17 @@ export class InventoryService {
     await this.lockProduct(tx, productId);
     const product = await tx.product.findUnique({ where: { id: productId } });
     if (!product) throw new AppError(404, 'Product not found');
-    const reservations = await tx.inventoryReservation.findMany({ where: { productId } });
+    const reservations = await tx.inventoryReservation.findMany({
+      where: { productId, active: true },
+    });
     const own = reservations.filter(
       (r) =>
         (link.salesOrderId && r.salesOrderId === link.salesOrderId) ||
         (link.manufacturingOrderId && r.manufacturingOrderId === link.manufacturingOrderId),
     );
     const ownQty = own.reduce((sum, r) => sum + Number(r.quantity), 0);
-    const otherQty = reservations.reduce((sum, r) => sum + Number(r.quantity), 0) - ownQty;
-    if (Number(product.onHandQty) - otherQty < quantity)
-      throw new AppError(422, 'Insufficient unreserved stock for issue');
+    if (Number(product.onHandQty) < quantity)
+      throw new AppError(422, 'Insufficient on-hand stock for issue');
     await this.move(
       tx,
       actorId,
@@ -90,7 +106,10 @@ export class InventoryService {
       if (remaining <= 0) break;
       const current = Number(reservation.quantity);
       if (current <= remaining) {
-        await tx.inventoryReservation.delete({ where: { id: reservation.id } });
+        await tx.inventoryReservation.update({
+          where: { id: reservation.id },
+          data: { active: false, releasedAt: new Date() },
+        });
         remaining -= current;
       } else {
         await tx.inventoryReservation.update({
@@ -204,6 +223,12 @@ export class InventoryService {
       },
     });
     await notificationService.checkLowStock(tx, productId);
+  }
+
+  async lockProducts(tx: Prisma.TransactionClient, productIds: string[]) {
+    for (const productId of [...new Set(productIds)].sort()) {
+      await this.lockProduct(tx, productId);
+    }
   }
 }
 export const inventoryService = new InventoryService();

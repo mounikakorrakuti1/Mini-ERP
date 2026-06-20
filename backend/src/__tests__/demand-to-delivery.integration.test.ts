@@ -206,8 +206,8 @@ test('sales rules reject locked edits, over delivery, duplicate procurement, and
     token,
   );
   assert.equal(overDelivery.status, 422);
-  const cancelled = await request(`/sales-orders/${so.data.id}/cancel`, { method: 'PATCH' }, token);
-  assert.equal(cancelled.data.status, 'CANCELLED');
+  const cancelled = await requestRaw(`/sales-orders/${so.data.id}/cancel`, { method: 'PATCH' }, token);
+  assert.equal(cancelled.status, 409);
 });
 
 test('purchase rules reject locked edits, over receipt, and cancellation after receiving', async () => {

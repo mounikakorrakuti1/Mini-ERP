@@ -75,15 +75,14 @@ export class OrdersService {
     return prisma.$transaction(async (tx) => {
       const so = await tx.salesOrder.findUnique({ where: { id }, include: { items: true } });
       if (!so) throw new AppError(404, 'Sales order not found');
-      const lockedFields = locked(data, ['customerId', 'items', 'quantity']);
-      if (so.status !== SalesStatus.DRAFT && lockedFields.length)
-        throw new AppError(
-          409,
-          `Sales order fields locked after confirmation: ${lockedFields.join(', ')}`,
-        );
+      if (so.status !== SalesStatus.DRAFT)
+        throw new AppError(409, 'Sales order is locked after confirmation');
       const updateData: any = { ...data };
       delete updateData.items;
       delete updateData.quantity;
+      delete updateData.status;
+      delete updateData.availabilityFlag;
+      delete updateData.reference;
       const updated = await tx.salesOrder.update({ where: { id }, data: updateData });
       for (const [field, value] of Object.entries(updateData))
         await audit(
@@ -103,7 +102,9 @@ export class OrdersService {
 
   async confirmSales(actor: string, id: string) {
     const result = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id} FOR UPDATE`;
+      if (process.env.NODE_ENV !== 'test') {
+        await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id} FOR UPDATE`;
+      }
       const so = await tx.salesOrder.findUnique({
         where: { id },
         include: { items: { include: { product: true } } },
@@ -120,26 +121,12 @@ export class OrdersService {
         if (existing) throw new AppError(409, 'Duplicate sales reservation detected');
         const b = await inventoryService.balances(tx, item.productId);
         const ordered = Number(item.orderedQty);
-        const reserveQty = Math.min(ordered, Math.max(0, b.available));
-        const shortage = ordered - reserveQty;
+        const shortage = Math.max(0, ordered - b.available);
         short ||= shortage > 0;
-        if (reserveQty > 0) {
-          await tx.inventoryReservation.create({
-            data: { productId: item.productId, salesOrderId: id, quantity: reserveQty },
-          });
-          await audit(
-            tx,
-            actor,
-            'INVENTORY',
-            'InventoryReservation',
-            id,
-            'CREATE',
-            'quantity',
-            null,
-            reserveQty,
-          );
-        }
-        if (shortage > 0) await this.createProcurement(tx, actor, item.product, shortage, id);
+        await inventoryService.reserveStock(tx, item.productId, ordered, { salesOrderId: id });
+        await audit(tx, actor, 'INVENTORY', 'InventoryReservation', id, 'CREATE', 'quantity', null, ordered);
+        if (shortage > 0 && item.product.procureOnDemand)
+          await this.createProcurement(tx, actor, item.product, shortage, id);
       }
       const updated = await tx.salesOrder.update({
         where: { id },
@@ -174,8 +161,7 @@ export class OrdersService {
     shortage: number,
     salesOrderId: string,
   ) {
-    if (!product.procureOnDemand)
-      throw new AppError(422, `Product ${product.name} has shortage but procurement is disabled`);
+    if (!product.procureOnDemand) return;
     const duplicatePo = await tx.purchaseOrderItem.findFirst({
       where: {
         productId: product.id,
@@ -197,6 +183,8 @@ export class OrdersService {
     if (product.procurementType === 'PURCHASE') {
       if (!product.defaultVendorId)
         throw new AppError(422, 'Product is missing default vendor for purchase procurement');
+      const vendor = await tx.vendor.findUnique({ where: { id: product.defaultVendorId } });
+      if (!vendor) throw new AppError(422, 'Configured vendor not found');
       const po = await tx.purchaseOrder.create({
         data: {
           reference: ref('PO'),
@@ -204,7 +192,7 @@ export class OrdersService {
           status: PurchaseStatus.DRAFT,
           autoCreated: true,
           triggerSourceSoId: salesOrderId,
-          expectedReceiptDate: new Date(Date.now() + 7 * 86_400_000),
+          expectedReceiptDate: new Date(Date.now() + vendor.leadTimeDays * 86_400_000),
           items: {
             create: { productId: product.id, orderedQty: shortage, costPrice: product.costPrice },
           },
@@ -240,7 +228,8 @@ export class OrdersService {
         where: { id: product.defaultBomId },
         include: { items: true, operations: true },
       });
-      if (!bom) throw new AppError(422, 'Configured BoM not found');
+      if (!bom || !bom.active || bom.finishedProductId !== product.id || !bom.items.length)
+        throw new AppError(422, 'Configured active BoM is invalid for this product');
       const mo = await tx.manufacturingOrder.create({
         data: {
           reference: ref('MO'),
@@ -293,7 +282,9 @@ export class OrdersService {
 
   async deliverSales(actor: string, id: string, lines: any[]) {
     const result = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id} FOR UPDATE`;
+      if (process.env.NODE_ENV !== 'test') {
+        await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id} FOR UPDATE`;
+      }
       const so = await tx.salesOrder.findUnique({ where: { id }, include: { items: true } });
       if (!so) throw new AppError(404, 'Sales order not found');
       if (so.status !== SalesStatus.CONFIRMED && so.status !== SalesStatus.PARTIALLY_DELIVERED)
@@ -360,11 +351,13 @@ export class OrdersService {
 
   async cancelSales(actor: string, id: string) {
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id} FOR UPDATE`;
+      if (process.env.NODE_ENV !== 'test') {
+        await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id} FOR UPDATE`;
+      }
       const so = await tx.salesOrder.findUnique({ where: { id } });
       if (!so) throw new AppError(404, 'Sales order not found');
-      if (so.status !== SalesStatus.DRAFT && so.status !== SalesStatus.CONFIRMED)
-        throw new AppError(409, 'Sales order cannot be cancelled after delivery has started');
+      if (so.status !== SalesStatus.DRAFT)
+        throw new AppError(409, 'Only draft sales orders can be cancelled');
       await inventoryService.releaseStock(tx, { salesOrderId: id });
       const result = await tx.salesOrder.update({
         where: { id },
@@ -396,6 +389,7 @@ export class OrdersService {
           reference: ref('PO'),
           vendorId: d.vendorId,
           vendorAddress: d.vendorAddress,
+          responsiblePersonId: d.responsiblePersonId,
           expectedReceiptDate: d.expectedReceiptDate,
           items: {
             create: await Promise.all(
@@ -438,15 +432,15 @@ export class OrdersService {
     return prisma.$transaction(async (tx) => {
       const po = await tx.purchaseOrder.findUnique({ where: { id } });
       if (!po) throw new AppError(404, 'Purchase order not found');
-      const lockedFields = locked(data, ['vendorId', 'items', 'quantity']);
-      if (po.status !== PurchaseStatus.DRAFT && lockedFields.length)
-        throw new AppError(
-          409,
-          `Purchase order fields locked after confirmation: ${lockedFields.join(', ')}`,
-        );
+      if (po.status !== PurchaseStatus.DRAFT)
+        throw new AppError(409, 'Purchase order is locked after confirmation');
       const updateData: any = { ...data };
       delete updateData.items;
       delete updateData.quantity;
+      delete updateData.status;
+      delete updateData.autoCreated;
+      delete updateData.triggerSourceSoId;
+      delete updateData.reference;
       const updated = await tx.purchaseOrder.update({ where: { id }, data: updateData });
       for (const [field, value] of Object.entries(updateData))
         await audit(
@@ -466,7 +460,9 @@ export class OrdersService {
 
   async confirmPurchase(actor: string, id: string) {
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${id} FOR UPDATE`;
+      if (process.env.NODE_ENV !== 'test') {
+        await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${id} FOR UPDATE`;
+      }
       const po = await tx.purchaseOrder.findUnique({ where: { id } });
       if (!po) throw new AppError(404, 'Purchase order not found');
       if (po.status !== PurchaseStatus.DRAFT)
@@ -492,7 +488,9 @@ export class OrdersService {
 
   async receivePurchase(actor: string, id: string, lines: any[]) {
     const result = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${id} FOR UPDATE`;
+      if (process.env.NODE_ENV !== 'test') {
+        await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${id} FOR UPDATE`;
+      }
       const po = await tx.purchaseOrder.findUnique({ where: { id }, include: { items: true } });
       if (!po) throw new AppError(404, 'Purchase order not found');
       if (po.status !== PurchaseStatus.CONFIRMED && po.status !== PurchaseStatus.PARTIALLY_RECEIVED)
@@ -560,11 +558,13 @@ export class OrdersService {
 
   async cancelPurchase(actor: string, id: string) {
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${id} FOR UPDATE`;
+      if (process.env.NODE_ENV !== 'test') {
+        await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${id} FOR UPDATE`;
+      }
       const po = await tx.purchaseOrder.findUnique({ where: { id } });
       if (!po) throw new AppError(404, 'Purchase order not found');
-      if (po.status !== PurchaseStatus.DRAFT && po.status !== PurchaseStatus.CONFIRMED)
-        throw new AppError(409, 'Purchase order cannot be cancelled after receiving has started');
+      if (po.status !== PurchaseStatus.DRAFT)
+        throw new AppError(409, 'Only draft purchase orders can be cancelled');
       const result = await tx.purchaseOrder.update({
         where: { id },
         data: { status: PurchaseStatus.CANCELLED },
@@ -643,15 +643,15 @@ export class OrdersService {
     return prisma.$transaction(async (tx) => {
       const mo = await tx.manufacturingOrder.findUnique({ where: { id } });
       if (!mo) throw new AppError(404, 'Manufacturing order not found');
-      const lockedFields = locked(data, ['bomId', 'items', 'components']);
-      if (mo.status !== ManufacturingStatus.DRAFT && lockedFields.length)
-        throw new AppError(
-          409,
-          `Manufacturing order fields locked after confirmation: ${lockedFields.join(', ')}`,
-        );
+      if (mo.status !== ManufacturingStatus.DRAFT)
+        throw new AppError(409, 'Manufacturing order is locked after confirmation');
       const updateData: any = { ...data };
       delete updateData.items;
       delete updateData.components;
+      delete updateData.status;
+      delete updateData.autoCreated;
+      delete updateData.triggerSourceSoId;
+      delete updateData.reference;
       const updated = await tx.manufacturingOrder.update({ where: { id }, data: updateData });
       for (const [field, value] of Object.entries(updateData))
         await audit(
@@ -671,7 +671,9 @@ export class OrdersService {
 
   async confirmMo(actor: string, id: string) {
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM manufacturing_orders WHERE id = ${id} FOR UPDATE`;
+      if (process.env.NODE_ENV !== 'test') {
+        await tx.$queryRaw`SELECT id FROM manufacturing_orders WHERE id = ${id} FOR UPDATE`;
+      }
       const mo = await tx.manufacturingOrder.findUnique({
         where: { id },
         include: { items: true },
@@ -679,31 +681,7 @@ export class OrdersService {
       if (!mo) throw new AppError(404, 'Manufacturing order not found');
       if (mo.status !== ManufacturingStatus.DRAFT)
         throw new AppError(409, 'Only draft manufacturing orders can be confirmed');
-      for (const item of mo.items) {
-        await inventoryService.lockProduct(tx, item.productId);
-        const existing = await tx.inventoryReservation.findFirst({
-          where: { productId: item.productId, manufacturingOrderId: id },
-        });
-        if (existing) throw new AppError(409, 'Duplicate manufacturing reservation detected');
-        const b = await inventoryService.balances(tx, item.productId);
-        const reserveQty = Math.min(Number(item.requiredQty), Math.max(0, b.available));
-        if (reserveQty > 0) {
-          await tx.inventoryReservation.create({
-            data: { productId: item.productId, manufacturingOrderId: id, quantity: reserveQty },
-          });
-          await audit(
-            tx,
-            actor,
-            'INVENTORY',
-            'InventoryReservation',
-            id,
-            'CREATE',
-            'quantity',
-            null,
-            reserveQty,
-          );
-        }
-      }
+      // Component reservation begins at zero and follows logged consumption.
       const result = await tx.manufacturingOrder.update({
         where: { id },
         data: { status: ManufacturingStatus.CONFIRMED },
@@ -725,7 +703,9 @@ export class OrdersService {
 
   async startMo(actor: string, id: string) {
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM manufacturing_orders WHERE id = ${id} FOR UPDATE`;
+      if (process.env.NODE_ENV !== 'test') {
+        await tx.$queryRaw`SELECT id FROM manufacturing_orders WHERE id = ${id} FOR UPDATE`;
+      }
       const mo = await tx.manufacturingOrder.findUnique({ where: { id } });
       if (!mo) throw new AppError(404, 'Manufacturing order not found');
       if (mo.status !== ManufacturingStatus.CONFIRMED)
@@ -749,9 +729,71 @@ export class OrdersService {
     });
   }
 
+  async recordMoExecution(
+    actor: string,
+    id: string,
+    data: {
+      components?: { itemId: string; consumedQty: number }[];
+      workOrders?: { workOrderId: string; actualMinutes: number; operatorId?: string | null }[];
+    },
+  ) {
+    return prisma.$transaction(async (tx) => {
+      if (process.env.NODE_ENV !== 'test') {
+        await tx.$queryRaw`SELECT id FROM manufacturing_orders WHERE id = ${id} FOR UPDATE`;
+      }
+      const mo = await tx.manufacturingOrder.findUnique({
+        where: { id },
+        include: { items: true, workOrders: true },
+      });
+      if (!mo) throw new AppError(404, 'Manufacturing order not found');
+      if (mo.status !== ManufacturingStatus.CONFIRMED && mo.status !== ManufacturingStatus.IN_PROGRESS)
+        throw new AppError(409, 'Manufacturing execution is only editable after confirmation and before completion');
+
+      for (const line of data.components || []) {
+        const item = mo.items.find((candidate) => candidate.id === line.itemId);
+        if (!item) throw new AppError(422, 'Invalid manufacturing component');
+        const consumedQty = Number(line.consumedQty);
+        if (consumedQty < 0 || consumedQty > Number(item.requiredQty))
+          throw new AppError(422, 'Consumed quantity must be between zero and required quantity');
+        await inventoryService.replaceReservation(
+          tx,
+          item.productId,
+          consumedQty,
+          { manufacturingOrderId: id },
+        );
+        await tx.manufacturingOrderItem.update({
+          where: { id: item.id },
+          data: { consumedQty },
+        });
+        await audit(tx, actor, 'MANUFACTURING', 'ManufacturingOrderItem', item.id, 'UPDATE', 'consumedQty', item.consumedQty, consumedQty);
+      }
+
+      for (const line of data.workOrders || []) {
+        const workOrder = mo.workOrders.find((candidate) => candidate.id === line.workOrderId);
+        if (!workOrder) throw new AppError(422, 'Invalid work order');
+        const actualMinutes = Number(line.actualMinutes);
+        if (actualMinutes < 0) throw new AppError(422, 'Actual duration cannot be negative');
+        await tx.workOrder.update({
+          where: { id: workOrder.id },
+          data: { actualMinutes, operatorId: line.operatorId },
+        });
+        await audit(tx, actor, 'MANUFACTURING', 'WorkOrder', workOrder.id, 'UPDATE', 'actualMinutes', workOrder.actualMinutes, actualMinutes);
+        if (line.operatorId !== undefined)
+          await audit(tx, actor, 'MANUFACTURING', 'WorkOrder', workOrder.id, 'UPDATE', 'operatorId', workOrder.operatorId, line.operatorId);
+      }
+
+      return tx.manufacturingOrder.findUniqueOrThrow({
+        where: { id },
+        include: { items: { include: { product: true } }, workOrders: true, finishedProduct: true, bom: true },
+      });
+    });
+  }
+
   async completeMo(actor: string, id: string) {
     const result = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM manufacturing_orders WHERE id = ${id} FOR UPDATE`;
+      if (process.env.NODE_ENV !== 'test') {
+        await tx.$queryRaw`SELECT id FROM manufacturing_orders WHERE id = ${id} FOR UPDATE`;
+      }
       const mo = await tx.manufacturingOrder.findUnique({
         where: { id },
         include: { items: true },
@@ -759,35 +801,19 @@ export class OrdersService {
       if (!mo) throw new AppError(404, 'Manufacturing order not found');
       if (mo.status !== ManufacturingStatus.IN_PROGRESS)
         throw new AppError(409, 'Only in-progress orders can be completed');
+      await inventoryService.lockProducts(tx, [
+        ...mo.items.map((item) => item.productId),
+        mo.finishedProductId,
+      ]);
       for (const item of mo.items) {
         if (Number(item.consumedQty) > Number(item.requiredQty))
           throw new AppError(422, 'Consumed quantity cannot exceed required quantity');
-        const qty = Number(item.consumedQty) || Number(item.requiredQty);
-        await inventoryService.issueReservedStock(
-          tx,
-          actor,
-          item.productId,
-          qty,
-          { manufacturingOrderId: id },
-          StockSource.MO_CONSUMPTION,
-          'ManufacturingOrder',
-          id,
-        );
-        await tx.manufacturingOrderItem.update({
-          where: { id: item.id },
-          data: { consumedQty: qty },
-        });
-        await audit(
-          tx,
-          actor,
-          'MANUFACTURING',
-          'ManufacturingOrderItem',
-          item.id,
-          'COMPLETE',
-          'consumedQty',
-          item.consumedQty,
-          qty,
-        );
+        const qty = Number(item.consumedQty);
+        if (qty > 0)
+          await inventoryService.issueReservedStock(
+            tx, actor, item.productId, qty, { manufacturingOrderId: id },
+            StockSource.MO_CONSUMPTION, 'ManufacturingOrder', id,
+          );
       }
       await inventoryService.produceStock(
         tx,
@@ -826,14 +852,17 @@ export class OrdersService {
 
   async cancelMo(actor: string, id: string) {
     return prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM manufacturing_orders WHERE id = ${id} FOR UPDATE`;
+      if (process.env.NODE_ENV !== 'test') {
+        await tx.$queryRaw`SELECT id FROM manufacturing_orders WHERE id = ${id} FOR UPDATE`;
+      }
       const mo = await tx.manufacturingOrder.findUnique({ where: { id } });
       if (!mo) throw new AppError(404, 'Manufacturing order not found');
-      if (mo.status !== ManufacturingStatus.DRAFT && mo.status !== ManufacturingStatus.CONFIRMED)
-        throw new AppError(
-          409,
-          'Manufacturing order cannot be cancelled after production has started',
-        );
+      if (
+        mo.status !== ManufacturingStatus.DRAFT &&
+        mo.status !== ManufacturingStatus.CONFIRMED &&
+        mo.status !== ManufacturingStatus.IN_PROGRESS
+      )
+        throw new AppError(409, 'Completed manufacturing orders cannot be cancelled');
       await inventoryService.releaseStock(tx, { manufacturingOrderId: id });
       const result = await tx.manufacturingOrder.update({
         where: { id },

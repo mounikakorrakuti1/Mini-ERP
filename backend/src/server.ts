@@ -17,8 +17,9 @@ import { inventoryService } from './services/inventory.service.js';
 import { dashboardService } from './services/dashboard.service.js';
 import { notificationService } from './services/notification.service.js';
 import { realtimeService } from './services/realtime.service.js';
+import { procurementService } from './services/procurement.service.js';
 import { openApiSpec } from './swagger.js';
-import { StockDirection, StockSource } from '@prisma/client';
+import { AuditAction, ProcurementType, ProductCategory, StockDirection, StockSource } from '@prisma/client';
 const app = express();
 const httpServer = createServer(app);
 realtimeService.init(httpServer);
@@ -27,8 +28,8 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('tiny'));
 app.use(rateLimit({ windowMs: 60_000, max: 120 }));
-const ok = (res: express.Response, data: any, status = 200) =>
-  res.status(status).json({ success: true, data });
+const ok = (res: express.Response, data: any, status = 200, meta: any = {}) =>
+  res.status(status).json({ data, meta, error: null });
 const body = (schema: z.ZodTypeAny) => (req: any, _res: any, next: any) => {
   try {
     req.body = schema.parse(req.body);
@@ -49,6 +50,47 @@ const items = z
   )
   .min(1);
 const dateField = z.coerce.date().optional();
+const productInput = z.object({
+  name: z.string().trim().min(1),
+  category: z.nativeEnum(ProductCategory).default(ProductCategory.RAW_MATERIAL),
+  salesPrice: z.coerce.number().nonnegative(),
+  costPrice: z.coerce.number().nonnegative(),
+  reorderPoint: z.coerce.number().nonnegative().default(0),
+  safetyStock: z.coerce.number().nonnegative().default(0),
+  procureOnDemand: z.boolean().default(false),
+  procurementType: z.nativeEnum(ProcurementType).optional().nullable(),
+  defaultVendorId: id.optional().nullable(),
+  defaultBomId: id.optional().nullable(),
+});
+const salesUpdateInput = z.object({
+  customerId: id.optional(),
+  customerAddress: z.string().optional().nullable(),
+  salesPersonId: id.optional().nullable(),
+  expectedDeliveryDate: z.coerce.date().optional().nullable(),
+});
+const purchaseUpdateInput = z.object({
+  vendorId: id.optional(),
+  vendorAddress: z.string().optional().nullable(),
+  responsiblePersonId: id.optional().nullable(),
+  expectedReceiptDate: z.coerce.date().optional().nullable(),
+});
+const moUpdateInput = z.object({
+  finishedProductId: id.optional(),
+  bomId: id.optional(),
+  quantity: z.coerce.number().positive().optional(),
+  plannedCompletionDate: z.coerce.date().optional().nullable(),
+});
+
+function validateProcurementConfiguration(data: any) {
+  if (!data.procureOnDemand) return;
+  if (!data.procurementType) throw new AppError(422, 'Procurement type is required');
+  if (data.procurementType === ProcurementType.PURCHASE) {
+    if (!data.defaultVendorId) throw new AppError(422, 'Default vendor is required');
+  }
+  if (data.procurementType === ProcurementType.MANUFACTURING) {
+    if (!data.defaultBomId) throw new AppError(422, 'Default BoM is required');
+  }
+}
 
 async function validateBom(tx: any, finishedProductId: string, items: any[]) {
   if (!finishedProductId) throw new AppError(422, 'BoM finished product is required');
@@ -95,13 +137,18 @@ app.post(
   ),
   asyncHandler(async (req, res) => {
     const hash = await bcrypt.hash(req.body.password, 12);
-    const user = await prisma.user.create({
-      data: {
-        loginId: req.body.loginId,
-        email: req.body.email,
-        passwordHash: hash,
-        name: req.body.name,
-      },
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: { loginId: req.body.loginId, email: req.body.email, passwordHash: hash, name: req.body.name },
+      });
+      for (const field of ['loginId', 'email', 'name'] as const)
+        await tx.auditLog.create({
+          data: { module: 'AUTH', recordType: 'User', recordId: created.id, action: 'CREATE', fieldName: field, newValue: created[field] },
+        });
+      await tx.auditLog.create({
+        data: { module: 'AUTH', recordType: 'User', recordId: created.id, action: 'CREATE', fieldName: 'passwordHash', newValue: 'Password changed.' },
+      });
+      return created;
     });
     ok(res, { id: user.id, loginId: user.loginId }, 201);
   }),
@@ -121,8 +168,8 @@ app.post(
     if (!user || !user.active || !(await bcrypt.compare(req.body.password, user.passwordHash)))
       throw new AppError(401, 'Invalid Login Id or Password');
     const permissions = user.roles.flatMap((x) => x.role.permissions.map((p) => ({ module: p.permission.module, accessLevel: p.accessLevel })));
-    const token = jwt.sign({ sub: user.id, permissions }, process.env.JWT_SECRET!, {
-      expiresIn: '15m',
+    const token = jwt.sign({ sub: user.id, ver: user.tokenVersion, permissions }, process.env.JWT_SECRET!, {
+      expiresIn: '12h',
     });
     await prisma.auditLog.create({
       data: {
@@ -133,7 +180,7 @@ app.post(
         action: 'LOGIN',
       },
     });
-    ok(res, { accessToken: token, user: { id: user.id, name: user.name, permissions } });
+    ok(res, { accessToken: token, user: { id: user.id, loginId: user.loginId, email: user.email, name: user.name, address: user.address, mobile: user.mobile, position: user.position, permissions } });
   }),
 );
 app.post(
@@ -142,20 +189,61 @@ app.post(
   asyncHandler(async (req, res) =>
     ok(res, {
       accessToken: jwt.sign(
-        { sub: req.user!.sub, permissions: req.user!.permissions },
+        { sub: req.user!.sub, ver: req.user!.ver, permissions: req.user!.permissions },
         process.env.JWT_SECRET!,
-        { expiresIn: '15m' },
+        { expiresIn: '12h' },
       ),
     }),
   ),
 );
-app.post('/auth/logout', authenticate, (_q, r) => r.status(204).send());
+app.post('/auth/logout', authenticate, asyncHandler(async (q, r) => {
+  await prisma.user.update({ where: { id: q.user!.sub }, data: { tokenVersion: { increment: 1 } } });
+  r.status(204).send();
+}));
+app.get('/auth/me', authenticate, asyncHandler(async (q, r) => {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: q.user!.sub },
+    select: { id: true, loginId: true, email: true, name: true, address: true, mobile: true, position: true, active: true },
+  });
+  ok(r, { ...user, permissions: q.user!.permissions });
+}));
+app.patch(
+  '/auth/me',
+  authenticate,
+  body(z.object({ name: z.string().trim().min(1).optional(), address: z.string().optional().nullable(), mobile: z.string().optional().nullable() })),
+  asyncHandler(async (q, r) => {
+    const user = await prisma.$transaction(async (tx) => {
+      const before = await tx.user.findUniqueOrThrow({ where: { id: q.user!.sub } });
+      const updated = await tx.user.update({ where: { id: q.user!.sub }, data: q.body });
+      for (const [field, value] of Object.entries(q.body))
+        await tx.auditLog.create({ data: { actorId: q.user!.sub, module: 'AUTH', recordType: 'User', recordId: before.id, action: 'UPDATE', fieldName: field, oldValue: String((before as any)[field] ?? ''), newValue: String(value ?? '') } });
+      return updated;
+    });
+    ok(r, { id: user.id, loginId: user.loginId, email: user.email, name: user.name, address: user.address, mobile: user.mobile, position: user.position, permissions: q.user!.permissions });
+  }),
+);
+app.patch(
+  '/auth/me/password',
+  authenticate,
+  body(z.object({ currentPassword: z.string(), newPassword: z.string().min(8).regex(/[A-Z]/).regex(/[a-z]/).regex(/[^A-Za-z0-9]/) })),
+  asyncHandler(async (q, r) => {
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: q.user!.sub } });
+    if (!(await bcrypt.compare(q.body.currentPassword, user.passwordHash)))
+      throw new AppError(422, 'Current password is incorrect');
+    const passwordHash = await bcrypt.hash(q.body.newPassword, 12);
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: user.id }, data: { passwordHash, tokenVersion: { increment: 1 } } });
+      await tx.auditLog.create({ data: { actorId: user.id, module: 'AUTH', recordType: 'User', recordId: user.id, action: 'UPDATE', fieldName: 'passwordHash', oldValue: 'Password changed.', newValue: 'Password changed.' } });
+    });
+    r.status(204).send();
+  }),
+);
 const master = (
   path: string,
   model: any,
-  permission: string,
   module: string,
   recordType: string,
+  schema: z.AnyZodObject,
 ) => {
   app.get(
     path,
@@ -167,11 +255,14 @@ const master = (
     path,
     authenticate,
     requirePermission(module.toUpperCase(), 'ADMIN'),
+    body(schema),
     asyncHandler(async (q, r) =>
       ok(
         r,
         await prisma.$transaction(async (tx) => {
-          const created = await (tx as any)[model.name].create({ data: q.body });
+          const created = await (tx as any)[model.name].create({
+            data: { ...q.body, reference: `${recordType === 'Customer' ? 'CUS' : 'VEN'}-${Date.now()}` },
+          });
           await tx.auditLog.create({
             data: {
               actorId: q.user!.sub,
@@ -193,6 +284,7 @@ const master = (
     `${path}/:id`,
     authenticate,
     requirePermission(module.toUpperCase(), 'ADMIN'),
+    body(schema.partial()),
     asyncHandler(async (q, r) =>
       ok(
         r,
@@ -223,11 +315,17 @@ const master = (
 master(
   '/customers',
   { ...prisma.customer, name: 'customer' },
-  'MANAGE_CUSTOMERS',
   'CUSTOMERS',
   'Customer',
+  z.object({ name: z.string().trim().min(1), address: z.string().optional().nullable(), contact: z.string().optional().nullable() }),
 );
-master('/vendors', { ...prisma.vendor, name: 'vendor' }, 'MANAGE_VENDORS', 'VENDORS', 'Vendor');
+master(
+  '/vendors',
+  { ...prisma.vendor, name: 'vendor' },
+  'VENDORS',
+  'Vendor',
+  z.object({ name: z.string().trim().min(1), address: z.string().optional().nullable(), contact: z.string().optional().nullable(), leadTimeDays: z.coerce.number().int().nonnegative().default(0) }),
+);
 app.get(
   '/products',
   authenticate,
@@ -238,15 +336,10 @@ app.post(
   '/products',
   authenticate,
   requirePermission('PRODUCTS', 'ADMIN'),
+  body(productInput),
   asyncHandler(async (q, r) => {
     const d = q.body;
-    if (
-      d.procureOnDemand &&
-      (!d.procurementType ||
-        (d.procurementType === 'PURCHASE' && !d.defaultVendorId) ||
-        (d.procurementType === 'MANUFACTURING' && !d.defaultBomId))
-    )
-      throw new AppError(422, 'Invalid procurement configuration');
+    validateProcurementConfiguration(d);
     ok(
       r,
       await prisma.$transaction(async (tx) => {
@@ -274,11 +367,17 @@ app.patch(
   '/products/:id',
   authenticate,
   requirePermission('PRODUCTS', 'ADMIN'),
-  asyncHandler(async (q, r) =>
-    ok(
-      r,
-      await prisma.$transaction(async (tx) => {
+  body(productInput.partial()),
+  asyncHandler(async (q, r) => {
+    ok(r, await prisma.$transaction(async (tx) => {
         const before = await tx.product.findUniqueOrThrow({ where: { id: q.params.id } });
+        const next = { ...before, ...q.body };
+        validateProcurementConfiguration(next);
+        if (next.defaultBomId) {
+          const bom = await tx.bom.findUnique({ where: { id: next.defaultBomId } });
+          if (!bom || !bom.active || bom.finishedProductId !== before.id)
+            throw new AppError(422, 'Default BoM must be active and belong to this product');
+        }
         const updated = await tx.product.update({ where: { id: q.params.id }, data: q.body });
         for (const [field, value] of Object.entries(q.body)) {
           await tx.auditLog.create({
@@ -295,9 +394,8 @@ app.patch(
           });
         }
         return updated;
-      }),
-    ),
-  ),
+      }));
+  }),
 );
 app.post(
   '/products/:id/adjust-stock',
@@ -346,16 +444,19 @@ app.post(
 app.get(
   '/dashboard/summary',
   authenticate,
+  requirePermission('DASHBOARDS', 'VIEW'),
   asyncHandler(async (_q, r) => ok(r, await dashboardService.summary())),
 );
 app.get(
   '/dashboard/business-health',
   authenticate,
+  requirePermission('DASHBOARDS', 'VIEW'),
   asyncHandler(async (_q, r) => ok(r, await dashboardService.businessHealth())),
 );
 app.get(
   '/dashboard/role-summary',
   authenticate,
+  requirePermission('DASHBOARDS', 'VIEW'),
   asyncHandler(async (q, r) => {
     const roles = await prisma.userRole.findMany({
       where: { userId: q.user!.sub },
@@ -428,6 +529,7 @@ app.patch(
   '/sales-orders/:id',
   authenticate,
   requirePermission('SALES_ORDERS', 'ADMIN'),
+  body(salesUpdateInput),
   asyncHandler(async (q, r) =>
     ok(r, await ordersService.updateSales(q.user!.sub, q.params.id, q.body)),
   ),
@@ -461,7 +563,7 @@ app.post(
   '/purchase-orders',
   authenticate,
   requirePermission('PURCHASE_ORDERS', 'ADMIN'),
-  body(z.object({ vendorId: id, vendorAddress: z.string().optional(), expectedReceiptDate: dateField, items })),
+  body(z.object({ vendorId: id, vendorAddress: z.string().optional(), responsiblePersonId: id.optional(), expectedReceiptDate: dateField, items })),
   asyncHandler(async (q, r) => ok(r, await ordersService.createPurchase(q.user!.sub, q.body), 201)),
 );
 app.get(
@@ -484,6 +586,7 @@ app.patch(
   '/purchase-orders/:id',
   authenticate,
   requirePermission('PURCHASE_ORDERS', 'ADMIN'),
+  body(purchaseUpdateInput),
   asyncHandler(async (q, r) =>
     ok(r, await ordersService.updatePurchase(q.user!.sub, q.params.id, q.body)),
   ),
@@ -535,6 +638,12 @@ app.post(
   '/bom',
   authenticate,
   requirePermission('BOM', 'ADMIN'),
+  body(z.object({
+    finishedProductId: id,
+    referenceQty: z.coerce.number().positive(),
+    items: z.array(z.object({ productId: id, quantity: z.coerce.number().positive() })).min(1),
+    operations: z.array(z.object({ name: z.string().trim().min(1), workCenter: z.string().optional().nullable(), expectedMinutes: z.coerce.number().positive() })).default([]),
+  })),
   asyncHandler(async (q, r) =>
     ok(
       r,
@@ -618,6 +727,7 @@ app.post(
   '/manufacturing-orders',
   authenticate,
   requirePermission('MANUFACTURING_ORDERS', 'ADMIN'),
+  body(z.object({ finishedProductId: id, bomId: id, quantity: z.coerce.number().positive(), plannedCompletionDate: dateField })),
   asyncHandler(async (q, r) => ok(r, await ordersService.createMo(q.user!.sub, q.body), 201)),
 );
 app.get(
@@ -640,6 +750,7 @@ app.patch(
   '/manufacturing-orders/:id',
   authenticate,
   requirePermission('MANUFACTURING_ORDERS', 'ADMIN'),
+  body(moUpdateInput),
   asyncHandler(async (q, r) =>
     ok(r, await ordersService.updateMo(q.user!.sub, q.params.id, q.body)),
   ),
@@ -655,6 +766,16 @@ app.patch(
   authenticate,
   requirePermission('MANUFACTURING_ORDERS', 'ADMIN'),
   asyncHandler(async (q, r) => ok(r, await ordersService.startMo(q.user!.sub, q.params.id))),
+);
+app.patch(
+  '/manufacturing-orders/:id/execution',
+  authenticate,
+  requirePermission('MANUFACTURING_ORDERS', 'ADMIN'),
+  body(z.object({
+    components: z.array(z.object({ itemId: id, consumedQty: z.coerce.number().nonnegative() })).optional(),
+    workOrders: z.array(z.object({ workOrderId: id, actualMinutes: z.coerce.number().nonnegative(), operatorId: z.string().optional().nullable() })).optional(),
+  }).refine((value) => value.components?.length || value.workOrders?.length, 'At least one execution update is required')),
+  asyncHandler(async (q, r) => ok(r, await ordersService.recordMoExecution(q.user!.sub, q.params.id, q.body))),
 );
 app.patch(
   '/manufacturing-orders/:id/complete',
@@ -674,13 +795,24 @@ app.get(
   requirePermission('INVENTORY', 'VIEW'),
   asyncHandler(async (_q, r) => {
     const products = await prisma.product.findMany({ where: { active: true } });
+    const activeReservations = await prisma.inventoryReservation.groupBy({
+      by: ['productId'],
+      where: { active: true },
+      _sum: { quantity: true }
+    });
+    const reservedMap = new Map(activeReservations.map(r => [r.productId, Number(r._sum.quantity || 0)]));
+    
     ok(
       r,
-      await prisma.$transaction((tx) =>
-        Promise.all(
-          products.map(async (p) => ({ ...p, ...(await inventoryService.balances(tx, p.id)) })),
-        ),
-      ),
+      products.map((p) => {
+        const reserved = reservedMap.get(p.id) || 0;
+        return {
+          ...p,
+          onHand: Number(p.onHandQty),
+          reserved,
+          available: Number(p.onHandQty) - reserved,
+        };
+      })
     );
   }),
 );
@@ -719,6 +851,14 @@ app.get(
     const mismatches = rows.filter((x) => Math.abs(x.difference) > 0.0001);
     ok(r, { status: mismatches.length ? 'MISMATCHED' : 'HEALTHY', mismatches, products: rows });
   }),
+);
+app.get(
+  '/procurement/recommendation',
+  authenticate,
+  requirePermission('PROCUREMENT', 'VIEW'),
+  asyncHandler(async (q, r) =>
+    ok(r, await procurementService.recommend(String(q.query.productId || ''), Number(q.query.quantity))),
+  ),
 );
 app.get(
   '/traceability/sales-order/:id',
@@ -779,9 +919,28 @@ app.get(
   '/audit-logs',
   authenticate,
   requirePermission('AUDIT_LOGS', 'VIEW'),
-  asyncHandler(async (_q, r) =>
-    ok(r, await prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 500 })),
-  ),
+  asyncHandler(async (q, r) => {
+    const page = Math.max(1, Number(q.query.page || 1));
+    const pageSize = Math.min(100, Math.max(1, Number(q.query.pageSize || 50)));
+    const where: any = {
+      ...(q.query.userId ? { actorId: String(q.query.userId) } : {}),
+      ...(q.query.module ? { module: String(q.query.module) } : {}),
+      ...(q.query.action ? { action: String(q.query.action) as AuditAction } : {}),
+      ...(q.query.recordType ? { recordType: String(q.query.recordType) } : {}),
+      ...(q.query.recordId ? { recordId: String(q.query.recordId) } : {}),
+      ...((q.query.dateFrom || q.query.dateTo) ? { createdAt: {
+        ...(q.query.dateFrom ? { gte: new Date(String(q.query.dateFrom)) } : {}),
+        ...(q.query.dateTo ? { lte: new Date(String(q.query.dateTo)) } : {}),
+      } } : {}),
+    };
+    const [items, total, grouped] = await Promise.all([
+      prisma.auditLog.findMany({ where, include: { actor: { select: { id: true, name: true, loginId: true } } }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize }),
+      prisma.auditLog.count({ where }),
+      prisma.auditLog.groupBy({ by: ['action'], where, _count: true }),
+    ]);
+    const counts = new Map(grouped.map((entry) => [entry.action, entry._count]));
+    ok(r, { items, pagination: { page, pageSize, total, pages: Math.ceil(total / pageSize) }, summary: { total, create: counts.get(AuditAction.CREATE) || 0, update: counts.get(AuditAction.UPDATE) || 0, delete: counts.get(AuditAction.DELETE) || 0 } });
+  }),
 );
 app.get(
   '/notifications',
@@ -797,8 +956,10 @@ app.patch(
     ok(
       r,
       await prisma.$transaction(async (tx) => {
+        const existing = await tx.notification.findFirst({ where: { id: q.params.id, userId: q.user!.sub } });
+        if (!existing) throw new AppError(404, 'Notification not found');
         const n = await tx.notification.update({
-          where: { id: q.params.id },
+          where: { id: existing.id },
           data: { readAt: new Date() },
         });
         await tx.auditLog.create({
@@ -848,9 +1009,14 @@ app.patch(
   asyncHandler(async (q, r) => {
     const { position, active, roleId } = q.body;
     const user = await prisma.$transaction(async (tx) => {
+      const before = await tx.user.findUniqueOrThrow({
+        where: { id: q.params.id },
+        include: { roles: true },
+      });
       const dataToUpdate: any = {};
       if (position !== undefined) dataToUpdate.position = position;
       if (active !== undefined) dataToUpdate.active = active;
+      if (active === false || roleId !== undefined) dataToUpdate.tokenVersion = { increment: 1 };
       
       const u = await tx.user.update({
         where: { id: q.params.id },
@@ -863,16 +1029,15 @@ app.patch(
           await tx.userRole.create({ data: { userId: q.params.id, roleId } });
         }
       }
-      
-      await tx.auditLog.create({
-        data: {
-          actorId: q.user!.sub,
-          module: 'AUTH',
-          recordType: 'User',
-          recordId: u.id,
-          action: 'UPDATE',
-        },
-      });
+      if (position !== undefined && position !== before.position)
+        await tx.auditLog.create({ data: { actorId: q.user!.sub, module: 'AUTH', recordType: 'User', recordId: u.id, action: 'UPDATE', fieldName: 'position', oldValue: before.position, newValue: position } });
+      if (active !== undefined && active !== before.active)
+        await tx.auditLog.create({ data: { actorId: q.user!.sub, module: 'AUTH', recordType: 'User', recordId: u.id, action: 'UPDATE', fieldName: 'active', oldValue: String(before.active), newValue: String(active) } });
+      if (roleId !== undefined) {
+        const oldRoleId = before.roles[0]?.roleId ?? null;
+        if (oldRoleId !== roleId)
+          await tx.auditLog.create({ data: { actorId: q.user!.sub, module: 'AUTH', recordType: 'User', recordId: u.id, action: 'PERMISSION_CHANGE', fieldName: 'roleId', oldValue: oldRoleId, newValue: roleId } });
+      }
       
       return u;
     });
@@ -880,4 +1045,8 @@ app.patch(
   })
 );
 app.use(errorHandler);
-app.listen(Number(process.env.PORT || 3000), () => console.log('Mini ERP API listening'));
+
+export { app, httpServer };
+if (process.env.NODE_ENV !== 'test') {
+  httpServer.listen(Number(process.env.PORT || 3000), () => console.log('Mini ERP API listening'));
+}

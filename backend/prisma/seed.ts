@@ -8,15 +8,16 @@ import {
   StockSource,
 } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import process from 'node:process';
 
 const prisma = new PrismaClient();
 const modulesList = [
   'PRODUCTS', 'SALES_ORDERS', 'PURCHASE_ORDERS', 'MANUFACTURING_ORDERS',
-  'BOM', 'VENDORS', 'CUSTOMERS', 'INVENTORY', 'AUDIT_LOGS', 'USER_MANAGEMENT', 'DASHBOARDS'
+  'BOM', 'VENDORS', 'CUSTOMERS', 'INVENTORY', 'PROCUREMENT', 'AUDIT_LOGS', 'USER_MANAGEMENT', 'DASHBOARDS'
 ];
 
 async function main() {
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     await tx.notification.deleteMany();
     await tx.auditLog.deleteMany();
     await tx.stockMovement.deleteMany();
@@ -64,6 +65,7 @@ async function main() {
       { role: roles.admin, module: perms.VENDORS, level: 'ADMIN' },
       { role: roles.admin, module: perms.CUSTOMERS, level: 'ADMIN' },
       { role: roles.admin, module: perms.INVENTORY, level: 'ADMIN' },
+      { role: roles.admin, module: perms.PROCUREMENT, level: 'ADMIN' },
       { role: roles.admin, module: perms.AUDIT_LOGS, level: 'ADMIN' },
       { role: roles.admin, module: perms.USER_MANAGEMENT, level: 'ADMIN' },
       { role: roles.admin, module: perms.DASHBOARDS, level: 'ADMIN' },
@@ -76,6 +78,7 @@ async function main() {
       { role: roles.owner, module: perms.VENDORS, level: 'VIEW' },
       { role: roles.owner, module: perms.CUSTOMERS, level: 'VIEW' },
       { role: roles.owner, module: perms.INVENTORY, level: 'VIEW' },
+      { role: roles.owner, module: perms.PROCUREMENT, level: 'VIEW' },
       { role: roles.owner, module: perms.DASHBOARDS, level: 'ADMIN' },
 
       { role: roles.sales, module: perms.PRODUCTS, level: 'VIEW' },
@@ -88,6 +91,7 @@ async function main() {
       { role: roles.purchase, module: perms.PURCHASE_ORDERS, level: 'ADMIN' },
       { role: roles.purchase, module: perms.VENDORS, level: 'ADMIN' },
       { role: roles.purchase, module: perms.INVENTORY, level: 'VIEW' },
+      { role: roles.purchase, module: perms.PROCUREMENT, level: 'ADMIN' },
       { role: roles.purchase, module: perms.DASHBOARDS, level: 'VIEW' },
 
       { role: roles.mfg, module: perms.PRODUCTS, level: 'VIEW' },
@@ -216,6 +220,7 @@ async function main() {
           data: {
             reference: `PROD-${String(i + 1).padStart(4, '0')}`,
             name: finished ? `Finished Furniture ${i - 29}` : materialNames[i],
+            category: finished ? 'FINISHED_GOOD' : 'RAW_MATERIAL',
             salesPrice: finished ? 4200 + i * 95 : 300 + i * 17,
             costPrice: finished ? 2400 + i * 55 : 160 + i * 11,
             onHandQty,

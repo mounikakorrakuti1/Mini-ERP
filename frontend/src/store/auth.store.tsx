@@ -23,7 +23,6 @@ interface AuthState {
   login: (credentials: any) => Promise<void>;
   register: (data: any) => Promise<void>;
   logout: () => void;
-  switchRole: (role: Role) => void;
 }
 
 // ─── Context ────────────────────────────────────────────────────

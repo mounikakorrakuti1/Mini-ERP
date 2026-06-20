@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Truck, FileText, Ban } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Truck, FileText, Ban, AlertCircle } from 'lucide-react';
 import { ROUTES } from '@/routes/routeMap';
 import { api } from '@/lib/api';
+import { useDb } from '@/store/db.store';
 
 export default function SalesOrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { products, refreshData } = useDb();
   const [order, setOrder] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -31,6 +33,7 @@ export default function SalesOrderDetailPage() {
       await api.patch(`/sales-orders/${id}/confirm`);
       alert('Order Confirmed successfully!');
       fetchOrder();
+      refreshData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to confirm order');
     }
@@ -39,7 +42,6 @@ export default function SalesOrderDetailPage() {
   const handleCreateDelivery = async () => {
     if (!order) return;
     try {
-      // Just auto-deliver all ordered quantity
       const itemsToDeliver = order.items.map((item: any) => ({
         itemId: item.id,
         deliveredQty: item.orderedQty - item.deliveredQty,
@@ -48,6 +50,7 @@ export default function SalesOrderDetailPage() {
       await api.patch(`/sales-orders/${id}/deliver`, { items: itemsToDeliver });
       alert('Delivery created! Status updated.');
       fetchOrder();
+      refreshData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to create delivery');
     }
@@ -59,6 +62,7 @@ export default function SalesOrderDetailPage() {
         await api.patch(`/sales-orders/${id}/cancel`);
         alert('Order has been cancelled.');
         fetchOrder();
+        refreshData();
       } catch (err: any) {
         alert(err.response?.data?.message || 'Failed to cancel order');
       }
@@ -129,7 +133,7 @@ export default function SalesOrderDetailPage() {
           >
             <FileText size={16} /> Print Invoice
           </button>
-          {order.status !== 'CANCELLED' && order.status !== 'DELIVERED' && (
+          {order.status !== 'CANCELLED' && order.status !== 'FULLY_DELIVERED' && (
             <button 
               className="btn btn--outline" 
               style={{ color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
@@ -149,24 +153,48 @@ export default function SalesOrderDetailPage() {
             <thead>
               <tr>
                 <th className="table__th">Product</th>
-                <th className="table__th">Description</th>
                 <th className="table__th">Ordered Qty</th>
                 <th className="table__th">Delivered Qty</th>
+                <th className="table__th">Availability</th>
                 <th className="table__th">Unit Price</th>
                 <th className="table__th">Subtotal</th>
               </tr>
             </thead>
             <tbody>
-              {order.items.map((item: any) => (
-                <tr className="table__tr" key={item.id}>
-                  <td className="table__td">{item.product?.code || 'Unknown'}</td>
-                  <td className="table__td">{item.product?.name || 'Unknown'}</td>
-                  <td className="table__td">{item.orderedQty}</td>
-                  <td className="table__td">{item.deliveredQty}</td>
-                  <td className="table__td">${Number(item.salesPrice).toLocaleString()}</td>
-                  <td className="table__td">${(item.orderedQty * item.salesPrice).toLocaleString()}</td>
-                </tr>
-              ))}
+              {order.items.map((item: any) => {
+                const globalProduct = products.find(p => p.id === item.productId);
+                const remaining = item.orderedQty - item.deliveredQty;
+                const canFulfill = globalProduct && globalProduct.freeToUse >= remaining;
+                return (
+                  <tr className="table__tr" key={item.id}>
+                    <td className="table__td">
+                      <div style={{ fontWeight: 500 }}>{item.product?.code || 'Unknown'}</div>
+                      <div className="text-xs text-muted">{item.product?.name}</div>
+                    </td>
+                    <td className="table__td">{item.orderedQty}</td>
+                    <td className="table__td">{item.deliveredQty}</td>
+                    <td className="table__td">
+                      {order.status === 'DRAFT' || order.status === 'CONFIRMED' || order.status === 'PARTIALLY_DELIVERED' ? (
+                        canFulfill ? (
+                          <span style={{ color: 'var(--status-success)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <CheckCircle size={14}/> In Stock
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--status-danger)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <AlertCircle size={14}/> 
+                            Need {remaining - (globalProduct?.freeToUse || 0)} 
+                            ({globalProduct?.procurementType || 'Procurement'})
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-muted">-</span>
+                      )}
+                    </td>
+                    <td className="table__td">${Number(item.salesPrice).toLocaleString()}</td>
+                    <td className="table__td">${(item.orderedQty * item.salesPrice).toLocaleString()}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

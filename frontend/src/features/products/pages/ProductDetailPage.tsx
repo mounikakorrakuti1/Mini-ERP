@@ -302,7 +302,7 @@ export default function ProductDetailPage() {
                           productMovements.map((m) => (
                             <tr key={m.id} style={{ borderBottom: '1px solid var(--border-main)', height: '40px' }}>
                               <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>
-                                {new Date(m.date).toLocaleString()}
+                                {new Date(m.createdAt).toLocaleString()}
                               </td>
                               <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'center' }}>
                                 <span

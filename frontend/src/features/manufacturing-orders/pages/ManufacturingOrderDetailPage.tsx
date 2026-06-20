@@ -3,10 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Factory, Ban } from 'lucide-react';
 import { ROUTES } from '@/routes/routeMap';
 import { api } from '@/lib/api';
+import { useDb } from '@/store/db.store';
 
 export default function ManufacturingOrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { refreshData } = useDb();
   const [order, setOrder] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -31,6 +33,7 @@ export default function ManufacturingOrderDetailPage() {
       await api.patch(`/manufacturing-orders/${id}/start`);
       alert('Manufacturing Order started.');
       fetchOrder();
+      refreshData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to start order');
     }
@@ -41,6 +44,7 @@ export default function ManufacturingOrderDetailPage() {
       await api.patch(`/manufacturing-orders/${id}/confirm`);
       alert('Manufacturing Order confirmed.');
       fetchOrder();
+      refreshData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to confirm order');
     }
@@ -51,6 +55,7 @@ export default function ManufacturingOrderDetailPage() {
       await api.patch(`/manufacturing-orders/${id}/complete`);
       alert('Manufacturing Order marked as Done. Finished goods added to stock.');
       fetchOrder();
+      refreshData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to complete order');
     }
@@ -62,6 +67,7 @@ export default function ManufacturingOrderDetailPage() {
         await api.patch(`/manufacturing-orders/${id}/cancel`);
         alert('Manufacturing Order has been cancelled.');
         fetchOrder();
+        refreshData();
       } catch (err: any) {
         alert(err.response?.data?.message || 'Failed to cancel order');
       }

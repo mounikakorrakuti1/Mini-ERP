@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth.store';
 import { useDb } from '@/store/db.store';
+import { hasPermission } from '@/lib/permissions';
+import { MODULE, PERMISSION_ACTION } from '@/types/enums';
 import { api } from '@/lib/api';
 import { ROUTES } from '@/routes/routeMap';
 import {
-  Package, ShoppingCart, Truck, Factory, AlertTriangle, Plus,
-  TrendingUp, BarChart2, ClipboardList, Wrench
+  TrendingUp, TrendingDown, Users, ShoppingCart, Truck, Factory,
+  ShieldCheck, AlertTriangle, Activity, CheckCircle, Package, ArrowUpRight, ArrowDownRight, Clock,
+  Plus, BarChart2, ClipboardList, Wrench
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -16,18 +19,24 @@ export default function DashboardPage() {
   const [salesOrders, setSalesOrders] = useState<any[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [manufacturingOrders, setManufacturingOrders] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>({});
+  const [roleSummary, setRoleSummary] = useState<any>({});
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [soRes, poRes, moRes] = await Promise.all([
+        const [soRes, poRes, moRes, sumRes, roleRes] = await Promise.all([
           api.get('/sales-orders'),
           api.get('/purchase-orders'),
           api.get('/manufacturing-orders'),
+          api.get('/dashboard/summary'),
+          api.get('/dashboard/role-summary'),
         ]);
         setSalesOrders(soRes.data.data || []);
         setPurchaseOrders(poRes.data.data || []);
         setManufacturingOrders(moRes.data.data || []);
+        setSummary(sumRes.data.data || {});
+        setRoleSummary(roleRes.data.data || {});
       } catch { /* silently handle */ }
     };
     load();
@@ -248,6 +257,200 @@ export default function DashboardPage() {
           </button>
         ))}
       </div>
+
+      {/* ─── ROLE BASED WIDGETS SECTION ───────────────────────────────── */}
+
+      {/* 1. ADMIN DASHBOARD VIEW */}
+      {hasPermission(user?.permissions, MODULE.AUDIT_LOGS, PERMISSION_ACTION.VIEW) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+          {/* Reconciliation Health Banner */}
+          {summary.reconciliationStatus === 'HEALTHY' ? (
+            <div
+              className="card"
+              style={{
+                backgroundColor: 'rgba(56, 161, 105, 0.08)',
+                border: '1px solid var(--status-success)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-sm)',
+                padding: 'var(--space-sm) var(--space-md)',
+              }}
+            >
+              <CheckCircle size={20} color="var(--status-success)" />
+              <div>
+                <strong style={{ color: 'var(--status-success)' }}>Reconciliation Health: PASS</strong>
+                <p className="text-xs" style={{ marginTop: '2px' }}>
+                  Standard mathematical constraints hold true. All product ledgers reconciled: 0 discrepancies detected.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="card"
+              style={{
+                backgroundColor: 'rgba(229, 62, 62, 0.08)',
+                border: '1px solid var(--status-danger)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-sm)',
+                padding: 'var(--space-sm) var(--space-md)',
+              }}
+            >
+              <AlertTriangle size={20} color="var(--status-danger)" />
+              <div>
+                <strong style={{ color: 'var(--status-danger)' }}>Ledger Reconciliation Mismatch Alert!</strong>
+                <p className="text-xs" style={{ marginTop: '2px' }}>
+                  There are products that fail the standard constraint: On Hand - Reserved !== Free-to-Use.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="details">
+            {/* Audit Summary Tile */}
+            <div className="card">
+              <h3 className="h3" style={{ borderBottom: '1px solid var(--border-main)', paddingBottom: 'var(--space-xs)', marginBottom: 'var(--space-sm)' }}>
+                System Status & Logs Summary
+              </h3>
+              <p className="text-xs" style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-sm)' }}>
+                Quick metrics of recent system action logs.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-sm)' }}>
+                <div style={{ padding: 'var(--space-sm)', backgroundColor: 'var(--bg-app)', borderRadius: 'var(--radius)' }}>
+                  <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Audit Log Entries</div>
+                  <div className="h3" style={{ margin: '4px 0' }}>{roleSummary?.admin?.totalAuditLogs || 0}</div>
+                  <div className="text-xs" style={{ color: 'var(--status-success)' }}>Today: +{summary.auditEventsToday || 0} logs</div>
+                </div>
+                <div style={{ padding: 'var(--space-sm)', backgroundColor: 'var(--bg-app)', borderRadius: 'var(--radius)' }}>
+                  <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Active Products</div>
+                  <div className="h3" style={{ margin: '4px 0' }}>{roleSummary?.admin?.activeProducts || 0}</div>
+                  <div className="text-xs" style={{ color: 'var(--accent-main)' }}>Total managed</div>
+                </div>
+              </div>
+              <button
+                className="btn btn--outline w-full"
+                onClick={() => navigate(ROUTES.AUDIT_LOGS)}
+                style={{ marginTop: 'var(--space-sm)', width: '100%', justifyContent: 'center' }}
+              >
+                Go to System Audit Logs
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. INVENTORY MANAGER DASHBOARD VIEW */}
+      {hasPermission(user?.permissions, MODULE.INVENTORY, PERMISSION_ACTION.ADMIN) && !hasPermission(user?.permissions, MODULE.AUDIT_LOGS, PERMISSION_ACTION.VIEW) && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--space-md)' }}>
+          {/* Main layout */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--space-md)' }}>
+            {/* Low Stock Alerts list */}
+            <div className="card">
+              <h3 className="h3" style={{ display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid var(--border-main)', paddingBottom: 'var(--space-xs)', marginBottom: 'var(--space-sm)' }}>
+                <AlertTriangle size={18} color="var(--status-danger)" />
+                Low Stock Alerts ({summary.lowStockProducts?.length || 0})
+              </h3>
+              <p className="text-xs" style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-xs)' }}>
+                The following products require replenishment (Free-to-Use is below safety reorder threshold):
+              </p>
+              <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
+                {summary.lowStockProducts?.length === 0 ? (
+                  <div className="text-xs" style={{ padding: 'var(--space-sm)', color: 'var(--status-success)', textAlign: 'center' }}>
+                    All products are within healthy stock levels.
+                  </div>
+                ) : (
+                  summary.lowStockProducts?.map((p: any) => (
+                    <div
+                      key={p.id}
+                      onClick={() => navigate(ROUTES.PRODUCTS + '/' + p.id)}
+                      style={{
+                        padding: 'var(--space-xs)',
+                        border: '1px solid var(--border-main)',
+                        borderRadius: 'var(--radius)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-app)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <div>
+                        <div className="text-sm" style={{ fontWeight: 500 }}>{p.name}</div>
+                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>SKU: {p.reference} | Reorder ROP: {p.reorderPoint}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div className="text-sm font-semibold" style={{ color: 'var(--status-danger)' }}>Free: {p.availableQty}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <button
+                className="btn btn--outline w-full"
+                onClick={() => navigate(ROUTES.INVENTORY_SUMMARY)}
+                style={{ marginTop: 'var(--space-sm)', width: '100%', justifyContent: 'center' }}
+              >
+                Go to Inventory Summary
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. BUSINESS OWNER DASHBOARD VIEW */}
+      {hasPermission(user?.permissions, MODULE.VENDORS, PERMISSION_ACTION.VIEW) && hasPermission(user?.permissions, MODULE.PRODUCTS, PERMISSION_ACTION.ADMIN) && !hasPermission(user?.permissions, MODULE.AUDIT_LOGS, PERMISSION_ACTION.VIEW) && !hasPermission(user?.permissions, MODULE.INVENTORY, PERMISSION_ACTION.ADMIN) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--space-md)' }}>
+            
+            {/* Delay Watch / Efficiency widget */}
+            <div className="card">
+              <h3 className="h3" style={{ borderBottom: '1px solid var(--border-main)', paddingBottom: 'var(--space-xs)', marginBottom: 'var(--space-sm)' }}>
+                Operations Efficiency
+              </h3>
+              <p className="text-xs" style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-sm)' }}>
+                Key operational metrics across departments.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: '2px' }}>
+                    <span>Delayed Sales Orders</span>
+                    <strong>{summary.delayedSalesOrders || 0}</strong>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: '2px' }}>
+                    <span>Delayed Purchase Orders</span>
+                    <strong>{summary.delayedPurchaseOrders || 0}</strong>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: '2px' }}>
+                    <span>Manufacturing Throughput (Completed)</span>
+                    <strong>{summary.manufacturingThroughput || 0}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 4. DEFAULT COMPLEMENTARY MSG FOR SPECIALIZED OPERATIONAL USERS */}
+      {(!hasPermission(user?.permissions, MODULE.AUDIT_LOGS, PERMISSION_ACTION.VIEW) && !hasPermission(user?.permissions, MODULE.INVENTORY, PERMISSION_ACTION.ADMIN) && !hasPermission(user?.permissions, MODULE.PRODUCTS, PERMISSION_ACTION.ADMIN)) && (
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', padding: 'var(--space-md)' }}>
+          <Users size={24} color="var(--accent-main)" />
+          <div>
+            <h4 className="text-md">Operational Workflow View</h4>
+            <p className="text-xs" style={{ color: 'var(--text-muted)', marginTop: '2px' }}>
+              Your account is assigned to specialized transactional screens. You can review core catalog listings in the sidebar.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

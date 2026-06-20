@@ -3,10 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Package, FileText, Ban } from 'lucide-react';
 import { ROUTES } from '@/routes/routeMap';
 import { api } from '@/lib/api';
+import { useDb } from '@/store/db.store';
 
 export default function PurchaseOrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { refreshData } = useDb();
   const [order, setOrder] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -31,6 +33,7 @@ export default function PurchaseOrderDetailPage() {
       await api.patch(`/purchase-orders/${id}/confirm`);
       alert('Purchase Order confirmed! Vendor has been notified.');
       fetchOrder();
+      refreshData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to confirm order');
     }
@@ -39,7 +42,6 @@ export default function PurchaseOrderDetailPage() {
   const handleReceive = async () => {
     if (!order) return;
     try {
-      // Auto-receive all remaining items
       const itemsToReceive = order.items.map((item: any) => ({
         itemId: item.id,
         receivedQty: item.orderedQty - item.receivedQty,
@@ -48,6 +50,7 @@ export default function PurchaseOrderDetailPage() {
       await api.patch(`/purchase-orders/${id}/receive`, { items: itemsToReceive });
       alert('Materials received and added to inventory.');
       fetchOrder();
+      refreshData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to receive materials');
     }
@@ -59,6 +62,7 @@ export default function PurchaseOrderDetailPage() {
         await api.patch(`/purchase-orders/${id}/cancel`);
         alert('Purchase Order has been cancelled.');
         fetchOrder();
+        refreshData();
       } catch (err: any) {
         alert(err.response?.data?.message || 'Failed to cancel order');
       }
@@ -129,7 +133,7 @@ export default function PurchaseOrderDetailPage() {
           >
             <FileText size={16} /> Print Record
           </button>
-          {order.status !== 'CANCELLED' && order.status !== 'RECEIVED' && (
+          {order.status !== 'CANCELLED' && order.status !== 'FULLY_RECEIVED' && (
             <button 
               className="btn btn--outline" 
               style={{ color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
