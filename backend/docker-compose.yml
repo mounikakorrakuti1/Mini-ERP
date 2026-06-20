@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-erp_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password}
+      POSTGRES_DB: ${DB_NAME:-erp_db}
+    ports: ['55433:5432']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-erp_user}:${DB_PASSWORD:-secure_password}@postgres:5432/${DB_NAME:-erp_db}
+      JWT_SECRET: ${JWT_SECRET:-development-secret-must-be-replaced-12345}
+      PORT: 3000
+    ports: ['3000:3000']
+    depends_on:
+      postgres: { condition: service_healthy }
