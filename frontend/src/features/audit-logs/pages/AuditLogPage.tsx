@@ -18,7 +18,7 @@ export default function AuditLogPage() {
     const fetchLogs = async () => {
       try {
         const res = await api.get('/audit-logs');
-        setLogs(res.data.data || []);
+        setLogs(res.data.data?.items || []);
       } catch (err) {
         console.error('Failed to fetch audit logs', err);
       } finally {
