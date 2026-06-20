@@ -12,6 +12,8 @@
     "db:seed:full": "tsx prisma/seed-full.ts",
     "demo:api": "tsx scripts/demo-api.ts",
     "demo:walkthrough": "tsx scripts/demo-walkthrough.ts",
+    "demo:trigger": "tsx src/scripts/trigger-demo.ts",
+    "train:model": "tsx src/scripts/train-model.ts",
     "format": "prettier . --write",
     "test:e2e": "tsx --test src/__tests__/demand-to-delivery.integration.test.ts",
     "test:coverage": "cross-env NODE_ENV=test c8 --all --include src/**/*.ts --exclude src/__tests__/** --reporter=lcov --reporter=text tsx --test --test-concurrency=1 src/__tests__/*.test.ts"
@@ -22,6 +24,7 @@
   "dependencies": {
     "@prisma/client": "^6.10.1",
     "bcryptjs": "^2.4.3",
+    "brain.js": "^2.0.0-beta.24",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",

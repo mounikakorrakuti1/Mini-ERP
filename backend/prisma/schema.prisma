@@ -63,6 +63,20 @@ enum AuditAction {
   INVENTORY_CHANGE
 }
 
+enum ProcurementAlertType {
+  LOW_STOCK
+  PREDICTED_STOCKOUT
+  HIGH_DEMAND
+  MATERIAL_SHORTAGE
+}
+
+enum RecommendationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
 enum AccessLevel {
   ADMIN
   VIEW
@@ -150,6 +164,7 @@ model Vendor {
   createdAt DateTime @default(now())
   products Product[]
   purchaseOrders PurchaseOrder[]
+  procurementRecommendations ProcurementRecommendation[]
   @@map("vendors")
 }
 model Product {
@@ -177,6 +192,9 @@ model Product {
   moFinished ManufacturingOrder[] @relation("FinishedGood")
   manufacturingItems ManufacturingOrderItem[]
   bomComponents BomItem[]
+  procurementAlerts ProcurementAlert[]
+  procurementRecommendations ProcurementRecommendation[]
+  demandHistory DemandHistory[]
   @@index([name])
   @@map("products")
 }
@@ -373,4 +391,44 @@ model Notification {
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, readAt])
   @@map("notifications")
+}
+
+model ProcurementAlert {
+  id String @id @default(uuid())
+  productId String
+  type ProcurementAlertType
+  message String
+  resolved Boolean @default(false)
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@index([productId, resolved])
+  @@map("procurement_alerts")
+}
+
+model ProcurementRecommendation {
+  id String @id @default(uuid())
+  productId String
+  vendorId String?
+  recommendedQty Decimal @db.Decimal(14, 3)
+  priority String
+  confidenceScore Decimal @db.Decimal(5, 2)
+  explanation String
+  status RecommendationStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  vendor Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  @@index([productId, status])
+  @@map("procurement_recommendations")
+}
+
+model DemandHistory {
+  id String @id @default(uuid())
+  productId String
+  date DateTime
+  totalQuantity Decimal @db.Decimal(14, 3)
+  createdAt DateTime @default(now())
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@unique([productId, date])
+  @@map("demand_history")
 }

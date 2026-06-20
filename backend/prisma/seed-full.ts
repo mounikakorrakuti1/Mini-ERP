@@ -78,33 +78,33 @@ function pad(value: number, size = 4) {
 async function main() {
   const passwordHash = await bcrypt.hash('User@123', 12);
 
-  await prisma.$transaction(async (tx) => {
-    await tx.notification.deleteMany({ where: { type: { startsWith: 'SEED_' } } });
-    await tx.auditLog.deleteMany({ where: { module: 'SEED' } });
-    await tx.stockMovement.deleteMany({ where: { referenceType: 'SEED' } });
-    await tx.inventoryReservation.deleteMany({ where: { product: { reference: { startsWith: 'PROD-SEED' } } } });
-    await tx.workOrder.deleteMany({ where: { manufacturingOrder: { reference: { startsWith: 'MO-SEED' } } } });
-    await tx.manufacturingOrderItem.deleteMany({ where: { manufacturingOrder: { reference: { startsWith: 'MO-SEED' } } } });
-    await tx.manufacturingOrder.deleteMany({ where: { reference: { startsWith: 'MO-SEED' } } });
-    await tx.purchaseOrderItem.deleteMany({ where: { purchaseOrder: { reference: { startsWith: 'PO-SEED' } } } });
-    await tx.purchaseOrder.deleteMany({ where: { reference: { startsWith: 'PO-SEED' } } });
-    await tx.salesOrderItem.deleteMany({ where: { salesOrder: { reference: { startsWith: 'SO-SEED' } } } });
-    await tx.salesOrder.deleteMany({ where: { reference: { startsWith: 'SO-SEED' } } });
-    await tx.bomOperation.deleteMany({ where: { bom: { reference: { startsWith: 'BOM-SEED' } } } });
-    await tx.bomItem.deleteMany({ where: { bom: { reference: { startsWith: 'BOM-SEED' } } } });
-    await tx.bom.deleteMany({ where: { reference: { startsWith: 'BOM-SEED' } } });
-    await tx.product.deleteMany({ where: { reference: { startsWith: 'PROD-SEED' } } });
-    await tx.customer.deleteMany({ where: { reference: { startsWith: 'CUST-SEED' } } });
-    await tx.vendor.deleteMany({ where: { reference: { startsWith: 'VEND-SEED' } } });
-    await tx.userRole.deleteMany({ where: { user: { loginId: { startsWith: 'dummy' } } } });
-    await tx.user.deleteMany({ where: { loginId: { startsWith: 'dummy' } } });
 
-    await tx.permission.createMany({
+    await prisma.notification.deleteMany({ where: { type: { startsWith: 'SEED_' } } });
+    await prisma.auditLog.deleteMany({ where: { module: 'SEED' } });
+    await prisma.stockMovement.deleteMany({ where: { referenceType: 'SEED' } });
+    await prisma.inventoryReservation.deleteMany({ where: { product: { reference: { startsWith: 'PROD-SEED' } } } });
+    await prisma.workOrder.deleteMany({ where: { manufacturingOrder: { reference: { startsWith: 'MO-SEED' } } } });
+    await prisma.manufacturingOrderItem.deleteMany({ where: { manufacturingOrder: { reference: { startsWith: 'MO-SEED' } } } });
+    await prisma.manufacturingOrder.deleteMany({ where: { reference: { startsWith: 'MO-SEED' } } });
+    await prisma.purchaseOrderItem.deleteMany({ where: { purchaseOrder: { reference: { startsWith: 'PO-SEED' } } } });
+    await prisma.purchaseOrder.deleteMany({ where: { reference: { startsWith: 'PO-SEED' } } });
+    await prisma.salesOrderItem.deleteMany({ where: { salesOrder: { reference: { startsWith: 'SO-SEED' } } } });
+    await prisma.salesOrder.deleteMany({ where: { reference: { startsWith: 'SO-SEED' } } });
+    await prisma.bomOperation.deleteMany({ where: { bom: { reference: { startsWith: 'BOM-SEED' } } } });
+    await prisma.bomItem.deleteMany({ where: { bom: { reference: { startsWith: 'BOM-SEED' } } } });
+    await prisma.bom.deleteMany({ where: { reference: { startsWith: 'BOM-SEED' } } });
+    await prisma.product.deleteMany({ where: { reference: { startsWith: 'PROD-SEED' } } });
+    await prisma.customer.deleteMany({ where: { reference: { startsWith: 'CUST-SEED' } } });
+    await prisma.vendor.deleteMany({ where: { reference: { startsWith: 'VEND-SEED' } } });
+    await prisma.userRole.deleteMany({ where: { user: { loginId: { startsWith: 'dummy' } } } });
+    await prisma.user.deleteMany({ where: { loginId: { startsWith: 'dummy' } } });
+
+    await prisma.permission.createMany({
       data: modulesList.map((module) => ({ module })),
       skipDuplicates: true,
     });
 
-    await tx.role.createMany({
+    await prisma.role.createMany({
       data: [
         { name: 'Admin', description: 'Full system access' },
         { name: 'Business Owner', description: 'Business owner with read access' },
@@ -117,8 +117,8 @@ async function main() {
     });
 
     const [roles, permissions] = await Promise.all([
-      tx.role.findMany(),
-      tx.permission.findMany(),
+      prisma.role.findMany(),
+      prisma.permission.findMany(),
     ]);
 
     const roleMap = new Map<string, { id: string; name: string }>();
@@ -181,7 +181,7 @@ async function main() {
       { role: 'Inventory Manager', module: 'DASHBOARDS', level: 'VIEW' },
     ];
 
-    await tx.rolePermission.createMany({
+    await prisma.rolePermission.createMany({
       data: matrix.map((entry) => ({
         roleId: roleMap.get(entry.role)!.id,
         permissionId: permissionMap.get(entry.module)!.id,
@@ -190,7 +190,7 @@ async function main() {
       skipDuplicates: true,
     });
 
-    const admin = await tx.user.upsert({
+    const admin = await prisma.user.upsert({
       where: { loginId: 'admin01' },
       update: { passwordHash },
       create: {
@@ -202,7 +202,7 @@ async function main() {
       },
     });
 
-    const owner = await tx.user.upsert({
+    const owner = await prisma.user.upsert({
       where: { loginId: 'owner01' },
       update: { passwordHash },
       create: {
@@ -214,7 +214,7 @@ async function main() {
       },
     });
 
-    const salesUser = await tx.user.upsert({
+    const salesUser = await prisma.user.upsert({
       where: { loginId: 'sales01' },
       update: { passwordHash },
       create: {
@@ -226,7 +226,7 @@ async function main() {
       },
     });
 
-    const purchaseUser = await tx.user.upsert({
+    const purchaseUser = await prisma.user.upsert({
       where: { loginId: 'buyer01' },
       update: { passwordHash },
       create: {
@@ -238,7 +238,7 @@ async function main() {
       },
     });
 
-    const mfgUser = await tx.user.upsert({
+    const mfgUser = await prisma.user.upsert({
       where: { loginId: 'mfg01' },
       update: { passwordHash },
       create: {
@@ -250,7 +250,7 @@ async function main() {
       },
     });
 
-    const invUser = await tx.user.upsert({
+    const invUser = await prisma.user.upsert({
       where: { loginId: 'inv01' },
       update: { passwordHash },
       create: {
@@ -262,8 +262,8 @@ async function main() {
       },
     });
 
-    await tx.userRole.deleteMany({ where: { userId: { in: [admin.id, owner.id, salesUser.id, purchaseUser.id, mfgUser.id, invUser.id] } } });
-    await tx.userRole.createMany({
+    await prisma.userRole.deleteMany({ where: { userId: { in: [admin.id, owner.id, salesUser.id, purchaseUser.id, mfgUser.id, invUser.id] } } });
+    await prisma.userRole.createMany({
       data: [
         { userId: admin.id, roleId: roleMap.get('Admin')!.id },
         { userId: owner.id, roleId: roleMap.get('Business Owner')!.id },
@@ -275,7 +275,7 @@ async function main() {
       skipDuplicates: true,
     });
 
-    const dummyUsers = Array.from({ length: 54 }, (_, index) => {
+    const dummyUsers = Array.from({ length: 400 }, (_, index) => {
       const number = index + 1;
       const active = index % 10 !== 0;
       const base = {
@@ -298,9 +298,9 @@ async function main() {
       return base;
     });
 
-    await tx.user.createMany({ data: dummyUsers, skipDuplicates: true });
+    await prisma.user.createMany({ data: dummyUsers, skipDuplicates: true });
 
-    const allDummyUsers = await tx.user.findMany({
+    const allDummyUsers = await prisma.user.findMany({
       where: { loginId: { startsWith: 'dummy' } },
       orderBy: { loginId: 'asc' },
     });
@@ -308,7 +308,7 @@ async function main() {
     const activeDummyUsers = allDummyUsers.filter((user) => user.active);
     const roleSequence = ['Sales User', 'Purchase User', 'Manufacturing User', 'Inventory Manager', 'Business Owner'];
 
-    await tx.userRole.createMany({
+    await prisma.userRole.createMany({
       data: activeDummyUsers.map((user, index) => ({
         userId: user.id,
         roleId: roleMap.get(getItem(roleSequence, index))!.id,
@@ -316,33 +316,51 @@ async function main() {
       skipDuplicates: true,
     });
 
-    const vendors = await tx.vendor.createMany({
-      data: vendorNames.map((name, index) => ({
-        reference: `VEND-SEED-${pad(index + 1, 3)}`,
-        name,
-        address: `${20 + index} Industrial Park, Bangalore`,
-        contact: `+91-90000${String(100000 + index).slice(-6)}`,
-        leadTimeDays: 2 + (index % 5),
-      })),
-      skipDuplicates: true,
-    });
+    const storedVendors = [];
+    for (let index = 0; index < 300; index++) {
+      const name = `${getItem(vendorNames, index)} ${index + 1}`;
+      const vendor = await prisma.vendor.upsert({
+        where: { reference: `VEND-SEED-${pad(index + 1, 4)}` },
+        update: {
+          name,
+          address: `${20 + index} Industrial Park, Bangalore`,
+          contact: `+91-90000${String(100000 + index).slice(-6)}`,
+          leadTimeDays: 2 + (index % 5),
+        },
+        create: {
+          reference: `VEND-SEED-${pad(index + 1, 4)}`,
+          name,
+          address: `${20 + index} Industrial Park, Bangalore`,
+          contact: `+91-90000${String(100000 + index).slice(-6)}`,
+          leadTimeDays: 2 + (index % 5),
+        },
+      });
+      storedVendors.push(vendor);
+    }
 
-    const customers = await tx.customer.createMany({
-      data: customerNames.slice(0, 30).map((name, index) => ({
-        reference: `CUST-SEED-${pad(index + 1, 3)}`,
-        name,
-        address: `${15 + index} Market Street, Bangalore`,
-        contact: `+91-98000${String(100000 + index).slice(-6)}`,
-      })),
-      skipDuplicates: true,
-    });
+    const storedCustomers = [];
+    for (let index = 0; index < 350; index++) {
+      const name = `${getItem(customerNames, index)} ${index + 1}`;
+      const customer = await prisma.customer.upsert({
+        where: { reference: `CUST-SEED-${pad(index + 1, 4)}` },
+        update: {
+          name,
+          address: `${15 + index} Market Street, Bangalore`,
+          contact: `+91-98000${String(100000 + index).slice(-6)}`,
+        },
+        create: {
+          reference: `CUST-SEED-${pad(index + 1, 4)}`,
+          name,
+          address: `${15 + index} Market Street, Bangalore`,
+          contact: `+91-98000${String(100000 + index).slice(-6)}`,
+        },
+      });
+      storedCustomers.push(customer);
+    }
 
-    const storedVendors = await tx.vendor.findMany({ where: { reference: { startsWith: 'VEND-SEED' } } });
-    const storedCustomers = await tx.customer.findMany({ where: { reference: { startsWith: 'CUST-SEED' } } });
-
-    const rawProductsData = rawMaterialNames.slice(0, 28).map((name, index) => ({
-      reference: `PROD-SEED-RAW-${pad(index + 1, 3)}`,
-      name,
+    const rawProductsData = Array.from({ length: 300 }).map((_, index) => ({
+      reference: `PROD-SEED-RAW-${pad(index + 1, 4)}`,
+      name: `${getItem(rawMaterialNames, index)} - Variant ${index + 1}`,
       category: 'RAW_MATERIAL',
       salesPrice: 200 + index * 5,
       costPrice: 120 + index * 3,
@@ -351,13 +369,13 @@ async function main() {
       safetyStock: 15,
       procureOnDemand: true,
       procurementType: 'PURCHASE',
-      defaultVendorId: getItem(storedVendors, index).id,
+      defaultVendorId: storedVendors[index % storedVendors.length].id,
       active: true,
     }));
 
-    const finishedProductsData = finishedProductNames.slice(0, 10).map((name, index) => ({
-      reference: `PROD-SEED-FIN-${pad(index + 1, 3)}`,
-      name,
+    const finishedProductsData = Array.from({ length: 150 }).map((_, index) => ({
+      reference: `PROD-SEED-FIN-${pad(index + 1, 4)}`,
+      name: `${getItem(finishedProductNames, index)} - Edition ${index + 1}`,
       category: 'FINISHED_GOOD',
       salesPrice: 4500 + index * 120,
       costPrice: 2500 + index * 90,
@@ -370,17 +388,17 @@ async function main() {
       active: true,
     }));
 
-    await tx.product.createMany({ data: [...rawProductsData, ...finishedProductsData], skipDuplicates: true });
+    await prisma.product.createMany({ data: [...rawProductsData, ...finishedProductsData], skipDuplicates: true });
 
-    const storedRawProducts = await tx.product.findMany({ where: { reference: { startsWith: 'PROD-SEED-RAW' } } });
-    const storedFinishedProducts = await tx.product.findMany({ where: { reference: { startsWith: 'PROD-SEED-FIN' } } });
+    const storedRawProducts = await prisma.product.findMany({ where: { reference: { startsWith: 'PROD-SEED-RAW' } } });
+    const storedFinishedProducts = await prisma.product.findMany({ where: { reference: { startsWith: 'PROD-SEED-FIN' } } });
 
     const boms = [];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 150; i++) {
       const finishedProduct = storedFinishedProducts[i];
-      const bom = await tx.bom.create({
+      const bom = await prisma.bom.create({
         data: {
-          reference: `BOM-SEED-${pad(i + 1, 3)}`,
+          reference: `BOM-SEED-${pad(i + 1, 4)}`,
           finishedProductId: finishedProduct.id,
           referenceQty: 1,
           items: {
@@ -398,19 +416,19 @@ async function main() {
         },
       });
 
-      await tx.product.update({ where: { id: finishedProduct.id }, data: { defaultBomId: bom.id } });
+      await prisma.product.update({ where: { id: finishedProduct.id }, data: { defaultBomId: bom.id } });
       boms.push(bom);
     }
 
     const salesOrders = [];
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 350; i++) {
       const customer = storedCustomers[i % storedCustomers.length];
       const product = getItem(storedFinishedProducts, i);
       const status = i < 10 ? 'CONFIRMED' : i < 14 ? 'DRAFT' : 'PARTIALLY_DELIVERED';
       const orderedQty = 2 + (i % 4);
       const deliveredQty = status === 'PARTIALLY_DELIVERED' ? 1 : 0;
 
-      const order = await tx.salesOrder.create({
+      const order = await prisma.salesOrder.create({
         data: {
           reference: `SO-SEED-${pad(i + 1, 4)}`,
           customerId: customer.id,
@@ -433,7 +451,7 @@ async function main() {
 
       salesOrders.push(order);
       if (status === 'CONFIRMED' || status === 'PARTIALLY_DELIVERED') {
-        await tx.inventoryReservation.create({
+        await prisma.inventoryReservation.create({
           data: {
             productId: product.id,
             salesOrderId: order.id,
@@ -442,8 +460,8 @@ async function main() {
         });
       }
       if (deliveredQty > 0) {
-        await tx.product.update({ where: { id: product.id }, data: { onHandQty: { decrement: deliveredQty } } });
-        await tx.stockMovement.create({
+        await prisma.product.update({ where: { id: product.id }, data: { onHandQty: { decrement: deliveredQty } } });
+        await prisma.stockMovement.create({
           data: {
             productId: product.id,
             direction: StockDirection.OUT,
@@ -459,14 +477,14 @@ async function main() {
     }
 
     const purchaseOrders = [];
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 350; i++) {
       const vendor = getItem(storedVendors, i);
       const product = storedRawProducts[i % storedRawProducts.length];
       const orderedQty = 40 + i * 2;
       const receivedQty = i % 3 === 0 ? orderedQty : Math.floor(orderedQty / 2);
       const status = receivedQty === orderedQty ? 'FULLY_RECEIVED' : 'PARTIALLY_RECEIVED';
 
-      const po = await tx.purchaseOrder.create({
+      const po = await prisma.purchaseOrder.create({
         data: {
           reference: `PO-SEED-${pad(i + 1, 4)}`,
           vendorId: vendor.id,
@@ -490,8 +508,8 @@ async function main() {
       });
 
       purchaseOrders.push(po);
-      await tx.product.update({ where: { id: product.id }, data: { onHandQty: { increment: receivedQty } } });
-      await tx.stockMovement.create({
+      await prisma.product.update({ where: { id: product.id }, data: { onHandQty: { increment: receivedQty } } });
+      await prisma.stockMovement.create({
         data: {
           productId: product.id,
           direction: StockDirection.IN,
@@ -505,12 +523,12 @@ async function main() {
       });
     }
 
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 150; i++) {
       const product = storedFinishedProducts[i];
       const bom = boms[i];
       const qty = 1 + (i % 3);
       const status = i < 4 ? 'COMPLETED' : 'CONFIRMED';
-      const mo = await tx.manufacturingOrder.create({
+      const mo = await prisma.manufacturingOrder.create({
         data: {
           reference: `MO-SEED-${pad(i + 1, 4)}`,
           finishedProductId: product.id,
@@ -532,9 +550,9 @@ async function main() {
       });
 
       if (status === 'COMPLETED') {
-        await tx.product.update({ where: { id: storedRawProducts[i % storedRawProducts.length].id }, data: { onHandQty: { decrement: qty * 3 } } });
-        await tx.product.update({ where: { id: product.id }, data: { onHandQty: { increment: qty } } });
-        await tx.stockMovement.createMany({
+        await prisma.product.update({ where: { id: storedRawProducts[i % storedRawProducts.length].id }, data: { onHandQty: { decrement: qty * 3 } } });
+        await prisma.product.update({ where: { id: product.id }, data: { onHandQty: { increment: qty } } });
+        await prisma.stockMovement.createMany({
           data: [
             {
               productId: storedRawProducts[i % storedRawProducts.length].id,
@@ -559,7 +577,7 @@ async function main() {
           ],
         });
       } else {
-        await tx.inventoryReservation.create({
+        await prisma.inventoryReservation.create({
           data: {
             productId: storedRawProducts[i % storedRawProducts.length].id,
             manufacturingOrderId: mo.id,
@@ -570,7 +588,7 @@ async function main() {
     }
 
     const allProducts = [...storedRawProducts, ...storedFinishedProducts];
-    await tx.stockMovement.createMany({
+    await prisma.stockMovement.createMany({
       data: allProducts.map((product) => ({
         productId: product.id,
         direction: StockDirection.IN,
@@ -604,9 +622,9 @@ async function main() {
       });
     }
 
-    await tx.auditLog.createMany({ data: auditData, skipDuplicates: true });
+    await prisma.auditLog.createMany({ data: auditData, skipDuplicates: true });
 
-    await tx.notification.createMany({
+    await prisma.notification.createMany({
       data: [
         { userId: admin.id, type: 'SEED_LOW_STOCK', message: 'Several products are below reorder point. Review inventory.', readAt: null },
         { userId: salesUser.id, type: 'SEED_ORDER_CONFIRMED', message: 'Seed sales orders are confirmed and reservations are active.', readAt: null },
@@ -614,7 +632,7 @@ async function main() {
       ],
       skipDuplicates: true,
     });
-  });
+  
 
   console.log('Seeded a large demo dataset (300-500 records) into the cloud database.');
 }

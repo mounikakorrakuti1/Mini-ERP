@@ -1069,6 +1069,38 @@ app.patch(
     ok(r, user);
   })
 );
+app.get(
+  '/procurement/alerts',
+  authenticate,
+  requirePermission('PROCUREMENT', 'VIEW'),
+  asyncHandler(async (_q, r) => ok(r, await procurementService.getActiveAlerts())),
+);
+
+app.get(
+  '/procurement/recommendations',
+  authenticate,
+  requirePermission('PROCUREMENT', 'VIEW'),
+  asyncHandler(async (_q, r) => ok(r, await procurementService.getPendingRecommendations())),
+);
+
+app.patch(
+  '/procurement/recommendations/:id/approve',
+  authenticate,
+  requirePermission('PROCUREMENT', 'ADMIN'),
+  asyncHandler(async (q, r) => ok(r, await procurementService.approveRecommendation(q.params.id, q.user!.sub))),
+);
+
+app.post(
+  '/procurement/generate',
+  authenticate,
+  requirePermission('PROCUREMENT', 'ADMIN'),
+  asyncHandler(async (_q, r) => {
+    await procurementService.generateAlerts();
+    await procurementService.generateRecommendations();
+    ok(r, { success: true });
+  }),
+);
+
 app.use(errorHandler);
 
 export { app, httpServer };
