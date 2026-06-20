@@ -123,7 +123,7 @@ export default function PurchaseOrderCreatePage() {
                       <td className="table__td">
                         <select className="input-field" style={{ width: '100%' }} value={item.productId} onChange={(e) => handleProductChange(index, e.target.value)} required>
                           <option value="">Select Material...</option>
-                          {products?.filter(p => p.category === 'Raw Material' || p.category === 'Component').map(p => (
+                          {products?.filter(p => p.category === 'Raw Material').map(p => (
                             <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
                           ))}
                         </select>

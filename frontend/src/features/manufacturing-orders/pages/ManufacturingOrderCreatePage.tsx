@@ -79,7 +79,7 @@ export default function ManufacturingOrderCreatePage() {
               <select className="input-field" value={bomId} onChange={e => setBomId(e.target.value)} required disabled={!finishedProductId}>
                 <option value="">Select BoM</option>
                 {filteredBoms.map(b => (
-                  <option key={b.id} value={b.id}>{b.reference}</option>
+                  <option key={b.id} value={b.id}>{(b as any).reference}</option>
                 ))}
               </select>
             </div>

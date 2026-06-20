@@ -10,8 +10,8 @@ export default function BomListPage() {
 
   const filteredBoms = boms.filter(b => {
     const q = searchQuery.toLowerCase();
-    const ref = (b.reference || b.id).toLowerCase();
-    const product = (b.finishedProduct?.name || '').toLowerCase();
+    const ref = ((b as any).reference || b.id).toLowerCase();
+    const product = ((b as any).finishedProduct?.name || '').toLowerCase();
     return ref.includes(q) || product.includes(q);
   });
 
@@ -58,9 +58,9 @@ export default function BomListPage() {
             ) : filteredBoms.length > 0 ? (
               filteredBoms.map((bom) => (
               <tr key={bom.id} className="table__tr">
-                <td className="table__td" style={{ fontWeight: 500 }}>{bom.reference || bom.id.slice(0,8)}</td>
-                <td className="table__td">{bom.finishedProduct?.name || 'Unknown Product'}</td>
-                <td className="table__td">{bom.items?.length || 0} components</td>
+                <td className="table__td" style={{ fontWeight: 500 }}>{(bom as any).reference || bom.id.slice(0,8)}</td>
+                <td className="table__td">{(bom as any).finishedProduct?.name || 'Unknown Product'}</td>
+                <td className="table__td">{(bom as any).items?.length || 0} components</td>
                 <td className="table__td" style={{ textAlign: 'right' }}>
                   <Link to={`${ROUTES.BOM_LIST}/${bom.id}`} className="btn btn--icon">
                     <Eye size={18} color="var(--text-muted)" />

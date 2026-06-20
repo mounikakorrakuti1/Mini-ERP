@@ -709,7 +709,7 @@ app.get(
         name: p.name,
         expected,
         actual,
-        difference: actual - expected,
+        difference: actual - Number(expected),
       };
     });
     const mismatches = rows.filter((x) => Math.abs(x.difference) > 0.0001);
