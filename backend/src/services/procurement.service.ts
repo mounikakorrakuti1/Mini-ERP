@@ -264,12 +264,18 @@ export class ProcurementService {
     });
 
     const demandMap = await this.calculateAllDailyDemands(30, db);
-    const updateFns: (() => Promise<any>)[] = [];
+    const existingRecs = await db.procurementRecommendation.findMany({ where: { status: 'PENDING' } });
+    const existingMap = new Map(existingRecs.map(r => [r.productId, r]));
+
+    const createData: any[] = [];
+    const updateData: any[] = [];
+    const supersedeIds: string[] = [];
+    const updateProductFns: (() => Promise<any>)[] = [];
 
     for (const product of products) {
       const dailyDemand = demandMap[product.id] || 0.1;
       const currentStock = Number(product.onHandQty);
-      const safetyStock = Number(product.safetyStock);
+      const safetyStock = Number(product.safetyStock || 0);
       const leadTime = product.vendor ? product.vendor.leadTimeDays : 7;
       
       const optimalROP = Math.ceil((dailyDemand * leadTime) + safetyStock);
@@ -277,6 +283,8 @@ export class ProcurementService {
 
       const expectedDemandDuringLeadTime = dailyDemand * leadTime;
       const recommendedQty = Math.ceil(expectedDemandDuringLeadTime + safetyStock - currentStock);
+
+      const existing = existingMap.get(product.id);
 
       if (recommendedQty > 0 && currentStock <= reorderPoint) {
         const confidenceScore = Math.min(99, 50 + (dailyDemand * 5));
@@ -294,30 +302,27 @@ export class ProcurementService {
            explanation += `Action: Purchase from ${product.vendor?.name || 'Unknown'}.`;
         }
 
-        updateFns.push(async () => {
-          const existing = await db.procurementRecommendation.findFirst({ where: { productId: product.id, status: 'PENDING' } });
-          if (existing) {
-            await db.procurementRecommendation.update({
-              where: { id: existing.id },
-              data: { recommendedQty, priority, confidenceScore, explanation }
-            });
-          } else {
-            await db.procurementRecommendation.create({
-              data: { productId: product.id, vendorId: product.vendorId, recommendedQty, priority, confidenceScore, explanation }
-            });
-          }
-        });
+        if (existing) {
+          updateData.push({ id: existing.id, recommendedQty, priority, confidenceScore, explanation });
+        } else {
+          createData.push({ productId: product.id, vendorId: product.vendorId, recommendedQty, priority, confidenceScore, explanation });
+        }
       } else {
-        updateFns.push(() => db.procurementRecommendation.updateMany({
-          where: { productId: product.id, status: 'PENDING' },
-          data: { status: 'SUPERSEDED' }
-        }));
+        if (existing) supersedeIds.push(existing.id);
       }
     }
     
-    if (updateFns.length > 0) {
-      for (let i = 0; i < updateFns.length; i += 15) {
-        await Promise.all(updateFns.slice(i, i + 15).map(fn => fn()));
+    if (supersedeIds.length > 0) {
+      await db.procurementRecommendation.updateMany({ where: { id: { in: supersedeIds } }, data: { status: 'SUPERSEDED' } });
+    }
+    if (createData.length > 0) {
+      await db.procurementRecommendation.createMany({ data: createData });
+    }
+    if (updateData.length > 0) {
+      for (let i = 0; i < updateData.length; i += 15) {
+        await Promise.all(updateData.slice(i, i + 15).map(data => 
+          db.procurementRecommendation.update({ where: { id: data.id }, data })
+        ));
       }
     }
   }
