@@ -29,7 +29,7 @@ export default function InventorySummaryPage() {
   const [search, setSearch] = useState('');
 
   const filtered = products.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.code.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.reference.toLowerCase().includes(search.toLowerCase());
     const isLow = p.freeToUse > 0 && p.freeToUse < p.reorderPoint;
     const isOut = p.freeToUse <= 0;
     if (filterStatus === 'LOW') return matchSearch && isLow;
@@ -152,7 +152,7 @@ export default function InventorySummaryPage() {
                     onClick={() => navigate(`${ROUTES.PRODUCTS}/${p.id}`)}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-app)')}
                     onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontFamily: 'monospace', fontSize: 'var(--text-sm)' }}>{p.code}</td>
+                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontFamily: 'monospace', fontSize: 'var(--text-sm)' }}>{p.reference}</td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 500, fontSize: 'var(--text-sm)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {p.name}

@@ -128,7 +128,7 @@ export default function InventoryLedgerPage() {
                     </td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontSize: 'var(--text-sm)', fontWeight: 500 }}>
                       <div>{product?.name ?? 'Unknown'}</div>
-                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{product?.code}</div>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{product?.reference}</div>
                     </td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontSize: 'var(--text-xs)', fontFamily: 'monospace', color: 'var(--accent-main)' }}>
                       {m.sourceReference || '—'}

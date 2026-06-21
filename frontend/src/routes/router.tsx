@@ -1,86 +1,84 @@
+import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
-import { ROUTES } from './routeMap';
 import { MODULE, PERMISSION_ACTION } from '@/types/enums';
 
-// Layouts & Guards
 import { RootLayout } from './RootLayout';
 import AuthLayout from '@/features/auth/AuthLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { PermissionRoute } from './PermissionRoute';
 import { NotFoundPage } from './NotFoundPage';
 
-// Landing
-import LandingPage from '@/features/landing/LandingPage';
+function PageLoader() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: '50%',
+          border: '3px solid var(--border-main)',
+          borderTopColor: 'var(--accent-main)',
+          animation: 'spin 0.8s linear infinite',
+        }}
+      />
+    </div>
+  );
+}
 
-// Auth Pages
-import LoginPage from '@/features/auth/pages/LoginPage';
-import SignupPage from '@/features/auth/pages/SignupPage';
-import ForgotPasswordPage from '@/features/auth/pages/ForgotPasswordPage';
+function suspense(Lazy: LazyExoticComponent<ComponentType>) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Lazy />
+    </Suspense>
+  );
+}
 
-// Dashboard
-import DashboardPage from '@/features/dashboard/pages/DashboardPage';
-
-// Products
-import ProductListPage from '@/features/products/pages/ProductListPage';
-import ProductDetailPage from '@/features/products/pages/ProductDetailPage';
-import ProductFormPage from '@/features/products/pages/ProductFormPage';
-
-// Inventory
-import InventoryLedgerPage from '@/features/inventory/pages/InventoryLedgerPage';
-import InventorySummaryPage from '@/features/inventory/pages/InventorySummaryPage';
-
-// Sales Orders
-import SalesOrderListPage from '@/features/sales-orders/pages/SalesOrderListPage';
-import SalesOrderDetailPage from '@/features/sales-orders/pages/SalesOrderDetailPage';
-import SalesOrderCreatePage from '@/features/sales-orders/pages/SalesOrderCreatePage';
-
-// Purchase Orders
-import PurchaseOrderListPage from '@/features/purchase-orders/pages/PurchaseOrderListPage';
-import PurchaseOrderDetailPage from '@/features/purchase-orders/pages/PurchaseOrderDetailPage';
-import PurchaseOrderCreatePage from '@/features/purchase-orders/pages/PurchaseOrderCreatePage';
-
-// Manufacturing Orders
-import ManufacturingOrderListPage from '@/features/manufacturing-orders/pages/ManufacturingOrderListPage';
-import ManufacturingOrderDetailPage from '@/features/manufacturing-orders/pages/ManufacturingOrderDetailPage';
-import ManufacturingOrderCreatePage from '@/features/manufacturing-orders/pages/ManufacturingOrderCreatePage';
-import KanbanBoardPage from '@/features/manufacturing-orders/pages/KanbanBoardPage';
-
-// Bill of Materials
-import BomListPage from '@/features/bom/pages/BomListPage';
-import BomDetailPage from '@/features/bom/pages/BomDetailPage';
-import BomCreatePage from '@/features/bom/pages/BomCreatePage';
-
-// Partners
-import VendorListPage from '@/features/partners/pages/VendorListPage';
-import CustomerListPage from '@/features/partners/pages/CustomerListPage';
-
-// Procurement
-import ProcurementRecommendationPage from '@/features/procurement/pages/ProcurementRecommendationPage';
-import TraceabilityPage from '@/features/procurement/pages/TraceabilityPage';
-
-// System & RBAC
-import AuditLogPage from '@/features/audit-logs/pages/AuditLogPage';
-import AnalyticsPage from '@/features/analytics/pages/AnalyticsPage';
-import UserManagementPage from '@/features/rbac/pages/UserManagementPage';
-import UserDetailPage from '@/features/rbac/pages/UserDetailPage';
-import ProfilePage from '@/features/rbac/pages/ProfilePage';
+const LandingPage = lazy(() => import('@/features/landing/LandingPage'));
+const LoginPage = lazy(() => import('@/features/auth/pages/LoginPage'));
+const SignupPage = lazy(() => import('@/features/auth/pages/SignupPage'));
+const ForgotPasswordPage = lazy(() => import('@/features/auth/pages/ForgotPasswordPage'));
+const DashboardPage = lazy(() => import('@/features/dashboard/pages/DashboardPage'));
+const ProductListPage = lazy(() => import('@/features/products/pages/ProductListPage'));
+const ProductDetailPage = lazy(() => import('@/features/products/pages/ProductDetailPage'));
+const ProductFormPage = lazy(() => import('@/features/products/pages/ProductFormPage'));
+const InventoryLedgerPage = lazy(() => import('@/features/inventory/pages/InventoryLedgerPage'));
+const InventorySummaryPage = lazy(() => import('@/features/inventory/pages/InventorySummaryPage'));
+const SalesOrderListPage = lazy(() => import('@/features/sales-orders/pages/SalesOrderListPage'));
+const SalesOrderDetailPage = lazy(() => import('@/features/sales-orders/pages/SalesOrderDetailPage'));
+const SalesOrderCreatePage = lazy(() => import('@/features/sales-orders/pages/SalesOrderCreatePage'));
+const PurchaseOrderListPage = lazy(() => import('@/features/purchase-orders/pages/PurchaseOrderListPage'));
+const PurchaseOrderDetailPage = lazy(() => import('@/features/purchase-orders/pages/PurchaseOrderDetailPage'));
+const PurchaseOrderCreatePage = lazy(() => import('@/features/purchase-orders/pages/PurchaseOrderCreatePage'));
+const ManufacturingOrderListPage = lazy(() => import('@/features/manufacturing-orders/pages/ManufacturingOrderListPage'));
+const ManufacturingOrderDetailPage = lazy(() => import('@/features/manufacturing-orders/pages/ManufacturingOrderDetailPage'));
+const ManufacturingOrderCreatePage = lazy(() => import('@/features/manufacturing-orders/pages/ManufacturingOrderCreatePage'));
+const KanbanBoardPage = lazy(() => import('@/features/manufacturing-orders/pages/KanbanBoardPage'));
+const BomListPage = lazy(() => import('@/features/bom/pages/BomListPage'));
+const BomDetailPage = lazy(() => import('@/features/bom/pages/BomDetailPage'));
+const BomCreatePage = lazy(() => import('@/features/bom/pages/BomCreatePage'));
+const VendorListPage = lazy(() => import('@/features/partners/pages/VendorListPage'));
+const CustomerListPage = lazy(() => import('@/features/partners/pages/CustomerListPage'));
+const ProcurementRecommendationPage = lazy(() => import('@/features/procurement/pages/ProcurementRecommendationPage'));
+const TraceabilityPage = lazy(() => import('@/features/procurement/pages/TraceabilityPage'));
+const AuditLogPage = lazy(() => import('@/features/audit-logs/pages/AuditLogPage'));
+const AnalyticsPage = lazy(() => import('@/features/analytics/pages/AnalyticsPage'));
+const UserManagementPage = lazy(() => import('@/features/rbac/pages/UserManagementPage'));
+const UserDetailPage = lazy(() => import('@/features/rbac/pages/UserDetailPage'));
+const ProfilePage = lazy(() => import('@/features/rbac/pages/ProfilePage'));
 
 export const router = createBrowserRouter([
-  // Public landing page
-  { path: '/', element: <LandingPage /> },
+  { path: '/', element: suspense(LandingPage) },
 
-  // Auth routes
   {
     path: '/auth',
     element: <AuthLayout />,
     children: [
-      { path: 'login', element: <LoginPage /> },
-      { path: 'signup', element: <SignupPage /> },
-      { path: 'forgot-password', element: <ForgotPasswordPage /> },
+      { path: 'login', element: suspense(LoginPage) },
+      { path: 'signup', element: suspense(SignupPage) },
+      { path: 'forgot-password', element: suspense(ForgotPasswordPage) },
     ],
   },
 
-  // Protected app routes
   {
     path: '/app',
     element: (
@@ -89,18 +87,17 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <DashboardPage /> },
+      { index: true, element: suspense(DashboardPage) },
 
-      // Products
       {
         path: 'products',
         children: [
-          { index: true, element: <ProductListPage /> },
+          { index: true, element: suspense(ProductListPage) },
           {
             path: 'new',
             element: (
               <PermissionRoute module={MODULE.PRODUCTS} action={PERMISSION_ACTION.ADMIN}>
-                <ProductFormPage />
+                {suspense(ProductFormPage)}
               </PermissionRoute>
             ),
           },
@@ -108,91 +105,86 @@ export const router = createBrowserRouter([
             path: ':id/edit',
             element: (
               <PermissionRoute module={MODULE.PRODUCTS} action={PERMISSION_ACTION.ADMIN}>
-                <ProductFormPage />
+                {suspense(ProductFormPage)}
               </PermissionRoute>
             ),
           },
-          { path: ':id', element: <ProductDetailPage /> },
+          { path: ':id', element: suspense(ProductDetailPage) },
         ],
       },
 
-      // Inventory
       {
         path: 'inventory/ledger',
         element: (
           <PermissionRoute module={MODULE.INVENTORY} action={PERMISSION_ACTION.VIEW}>
-            <InventoryLedgerPage />
+            {suspense(InventoryLedgerPage)}
           </PermissionRoute>
         ),
       },
-      { path: 'inventory/summary', element: <InventorySummaryPage /> },
+      { path: 'inventory/summary', element: suspense(InventorySummaryPage) },
 
-      // Sales Orders
       {
         path: 'sales-orders',
         element: <PermissionRoute module={MODULE.SALES_ORDERS} action={PERMISSION_ACTION.VIEW} />,
         children: [
-          { index: true, element: <SalesOrderListPage /> },
+          { index: true, element: suspense(SalesOrderListPage) },
           {
             path: 'new',
             element: (
               <PermissionRoute module={MODULE.SALES_ORDERS} action={PERMISSION_ACTION.ADMIN}>
-                <SalesOrderCreatePage />
+                {suspense(SalesOrderCreatePage)}
               </PermissionRoute>
             ),
           },
-          { path: ':id', element: <SalesOrderDetailPage /> },
+          { path: ':id', element: suspense(SalesOrderDetailPage) },
         ],
       },
 
-      // Purchase Orders
       {
         path: 'purchase-orders',
         element: <PermissionRoute module={MODULE.PURCHASE_ORDERS} action={PERMISSION_ACTION.VIEW} />,
         children: [
-          { index: true, element: <PurchaseOrderListPage /> },
+          { index: true, element: suspense(PurchaseOrderListPage) },
           {
             path: 'new',
             element: (
               <PermissionRoute module={MODULE.PURCHASE_ORDERS} action={PERMISSION_ACTION.ADMIN}>
-                <PurchaseOrderCreatePage />
+                {suspense(PurchaseOrderCreatePage)}
               </PermissionRoute>
             ),
           },
-          { path: ':id', element: <PurchaseOrderDetailPage /> },
+          { path: ':id', element: suspense(PurchaseOrderDetailPage) },
         ],
       },
 
-      // Manufacturing Orders
       {
         path: 'manufacturing-orders',
         element: <PermissionRoute module={MODULE.MANUFACTURING_ORDERS} action={PERMISSION_ACTION.VIEW} />,
         children: [
-          { index: true, element: <ManufacturingOrderListPage /> },
-          { path: 'kanban', element: <KanbanBoardPage /> },
+          { index: true, element: suspense(ManufacturingOrderListPage) },
+          { path: 'kanban', element: suspense(KanbanBoardPage) },
           {
             path: 'new',
             element: (
               <PermissionRoute module={MODULE.MANUFACTURING_ORDERS} action={PERMISSION_ACTION.ADMIN}>
-                <ManufacturingOrderCreatePage />
+                {suspense(ManufacturingOrderCreatePage)}
               </PermissionRoute>
             ),
           },
-          { path: ':id', element: <ManufacturingOrderDetailPage /> },
+          { path: ':id', element: suspense(ManufacturingOrderDetailPage) },
         ],
       },
 
-      // Bill of Materials
       {
         path: 'bom',
         element: <PermissionRoute module={MODULE.BOM} action={PERMISSION_ACTION.VIEW} />,
         children: [
-          { index: true, element: <BomListPage /> },
+          { index: true, element: suspense(BomListPage) },
           {
             path: 'new',
             element: (
               <PermissionRoute module={MODULE.BOM} action={PERMISSION_ACTION.ADMIN}>
-                <BomCreatePage />
+                {suspense(BomCreatePage)}
               </PermissionRoute>
             ),
           },
@@ -200,41 +192,38 @@ export const router = createBrowserRouter([
             path: ':id/edit',
             element: (
               <PermissionRoute module={MODULE.BOM} action={PERMISSION_ACTION.ADMIN}>
-                <BomCreatePage />
+                {suspense(BomCreatePage)}
               </PermissionRoute>
             ),
           },
-          { path: ':id', element: <BomDetailPage /> },
+          { path: ':id', element: suspense(BomDetailPage) },
         ],
       },
 
-      // Partners
-      { path: 'vendors', element: <VendorListPage /> },
-      { path: 'customers', element: <CustomerListPage /> },
+      { path: 'vendors', element: suspense(VendorListPage) },
+      { path: 'customers', element: suspense(CustomerListPage) },
 
-      // Procurement
-      { path: 'procurement', element: <ProcurementRecommendationPage /> },
-      { path: 'procurement/traceability/:soId', element: <TraceabilityPage /> },
+      { path: 'procurement', element: suspense(ProcurementRecommendationPage) },
+      { path: 'procurement/traceability/:soId', element: suspense(TraceabilityPage) },
 
-      // System
       {
         path: 'audit-logs',
         element: (
           <PermissionRoute module={MODULE.AUDIT_LOGS} action={PERMISSION_ACTION.ADMIN}>
-            <AuditLogPage />
+            {suspense(AuditLogPage)}
           </PermissionRoute>
         ),
       },
-      { path: 'analytics', element: <AnalyticsPage /> },
+      { path: 'analytics', element: suspense(AnalyticsPage) },
       {
         path: 'admin/users',
         element: <PermissionRoute module={MODULE.USER_MANAGEMENT} action={PERMISSION_ACTION.ADMIN} />,
         children: [
-          { index: true, element: <UserManagementPage /> },
-          { path: ':id', element: <UserDetailPage /> },
+          { index: true, element: suspense(UserManagementPage) },
+          { path: ':id', element: suspense(UserDetailPage) },
         ],
       },
-      { path: 'profile', element: <ProfilePage /> },
+      { path: 'profile', element: suspense(ProfilePage) },
     ],
   },
   { path: '*', element: <NotFoundPage /> },

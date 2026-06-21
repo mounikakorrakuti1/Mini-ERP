@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Package, Boxes, ShoppingCart, Truck, Factory,
+  LayoutDashboard, Package, Boxes, ShoppingCart, Truck, Factory, Armchair,
   ListTree, Workflow, Users, Building2, History, BarChart3,
   ShieldCheck, User, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
@@ -54,7 +54,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <li style={{ cursor: 'pointer' }} onClick={onToggle}>
           <a href="#" onClick={(e) => e.preventDefault()}>
             <span className="icon">
-              <Factory size={28} />
+              <Armchair size={28} />
             </span>
             <span className="title" style={{ fontWeight: 800, fontSize: '1.7rem', transform: 'translateY(4px)' }}>Furnexa</span>
           </a>

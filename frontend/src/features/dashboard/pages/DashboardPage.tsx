@@ -209,7 +209,7 @@ export default function DashboardPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = '')}>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 500, fontSize: 'var(--text-sm)' }}>
                       <div>{p.name}</div>
-                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{p.code}</div>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{p.reference}</div>
                     </td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontSize: 'var(--text-sm)', color: p.freeToUse <= 0 ? 'var(--status-danger)' : 'var(--status-warning)', fontWeight: 600 }}>
                       {p.freeToUse} {p.freeToUse <= 0 ? '(Out)' : ''}

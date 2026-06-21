@@ -101,13 +101,17 @@ export default function ProductDetailPage() {
                       padding: '2px 8px',
                       borderRadius: '9999px',
                       backgroundColor:
-                        product.category === 'Raw Material'
+                        product.category === 'RAW_MATERIAL'
                           ? 'rgba(3, 105, 161, 0.1)'
-                          : 'rgba(56, 161, 105, 0.1)',
+                          : product.category === 'FINISHED_GOOD'
+                            ? 'rgba(56, 161, 105, 0.1)'
+                            : 'rgba(113, 128, 150, 0.1)',
                       color:
-                        product.category === 'Raw Material'
+                        product.category === 'RAW_MATERIAL'
                           ? 'var(--accent-main)'
-                          : 'var(--status-success)',
+                          : product.category === 'FINISHED_GOOD'
+                            ? 'var(--status-success)'
+                            : 'var(--text-muted)',
                       fontWeight: 600,
                     }}
                   >

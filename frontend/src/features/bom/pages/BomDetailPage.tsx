@@ -100,7 +100,7 @@ export default function BomDetailPage() {
               <tbody>
                 {bom.items?.map((item: any) => (
                   <tr className="table__tr" key={item.id}>
-                    <td className="table__td">{item.product?.name || 'Unknown'} ({item.product?.code || 'N/A'})</td>
+                    <td className="table__td">{item.product?.name || 'Unknown'} ({item.product?.reference || 'N/A'})</td>
                     <td className="table__td">{Number(item.quantity).toFixed(2)}</td>
                     <td className="table__td">${Number(item.product?.costPrice || 0).toFixed(2)}</td>
                     <td className="table__td">${(Number(item.quantity) * Number(item.product?.costPrice || 0)).toFixed(2)}</td>

@@ -168,7 +168,7 @@ export default function SalesOrderDetailPage() {
                 return (
                   <tr className="table__tr" key={item.id}>
                     <td className="table__td">
-                      <div style={{ fontWeight: 500 }}>{item.product?.code || 'Unknown'}</div>
+                      <div style={{ fontWeight: 500 }}>{item.product?.reference || 'Unknown'}</div>
                       <div className="text-xs text-muted">{item.product?.name}</div>
                     </td>
                     <td className="table__td">{item.orderedQty}</td>

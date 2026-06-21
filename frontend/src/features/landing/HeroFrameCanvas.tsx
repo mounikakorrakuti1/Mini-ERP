@@ -1,158 +1,223 @@
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+/**
+ * Cinematic scroll-driven image-sequence animation.
+ * Frames live in `public/images/light/` and `public/images/dark/`.
+ */
 
-/* ─── Config ────────────────────────────────────────────────── */
-const TOTAL_FRAMES = 100;
-const LERP_SPEED   = 0.12;
-const PRELOAD_BATCH = 20;
+import { useEffect, useRef, useCallback } from 'react';
+import { useThemeStore } from '@/store/theme.store';
+import { getHeroFrameUrls, HERO_TOTAL_FRAMES } from './heroFrames';
+
+const LERP_SPEED = 0.14;
+const PRELOAD_BATCH = 24;
 const SCROLL_TRACK_CLASS = 'hero-scroll-track';
-const pad3 = (n: number) => String(n).padStart(3, '0');
 
 export default function HeroFrameCanvas() {
-  const frameUrls = useMemo(
-    () => Array.from({ length: TOTAL_FRAMES }, (_, i) => `/furnexa/ezgif-frame-${pad3(i + 1)}.jpg`),
-    []
+  const { theme } = useThemeStore();
+  const frameUrls = getHeroFrameUrls(theme);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imagesRef = useRef<(HTMLImageElement | null)[]>(
+    new Array(HERO_TOTAL_FRAMES).fill(null),
   );
+  const stateRef = useRef({
+    currentFrame: 22,
+    targetFrame: 22,
+    rafId: null as number | null,
+    loadedCount: 0,
+    isReady: false,
+  });
 
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const imagesRef  = useRef<(HTMLImageElement | null)[]>(new Array(TOTAL_FRAMES).fill(null));
-  const stateRef   = useRef({ currentFrame: 0, targetFrame: 0, rafId: 0, loadedCount: 0, isReady: false });
-
-  /* ── Frame preloader ─────────────────────────── */
   const preloadFrames = useCallback(async (urls: string[]) => {
-    for (let start = 0; start < TOTAL_FRAMES; start += PRELOAD_BATCH) {
-      const end   = Math.min(start + PRELOAD_BATCH, TOTAL_FRAMES);
-      const batch = urls.slice(start, end).map((url, bi) =>
-        new Promise<void>((resolve) => {
-          const img  = new Image();
-          img.src    = url;
-          img.onload = () => {
-            imagesRef.current[start + bi] = img;
-            stateRef.current.loadedCount++;
-            if (stateRef.current.loadedCount >= PRELOAD_BATCH) stateRef.current.isReady = true;
-            resolve();
-          };
-          img.onerror = () => resolve();
-        })
+    for (let start = 0; start < HERO_TOTAL_FRAMES; start += PRELOAD_BATCH) {
+      const end = Math.min(start + PRELOAD_BATCH, HERO_TOTAL_FRAMES);
+      const batch = urls.slice(start, end).map(
+        (url, bi) =>
+          new Promise<void>((resolve) => {
+            const img = new Image();
+            img.src = url;
+            img.onload = () => {
+              imagesRef.current[start + bi] = img;
+              stateRef.current.loadedCount++;
+              if (stateRef.current.loadedCount >= PRELOAD_BATCH) {
+                stateRef.current.isReady = true;
+              }
+              resolve();
+            };
+            img.onerror = () => resolve();
+          }),
       );
       await Promise.all(batch);
     }
     stateRef.current.isReady = true;
   }, []);
 
-  /* ── Canvas draw ─────────────────────────────── */
   const drawFrame = useCallback((frameIndex: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const idx = Math.round(Math.max(0, Math.min(TOTAL_FRAMES - 1, frameIndex)));
-    const img  = imagesRef.current[idx];
+
+    const idx = Math.round(Math.max(0, Math.min(HERO_TOTAL_FRAMES - 1, frameIndex)));
+    const img = imagesRef.current[idx];
     if (!img?.complete || !img.naturalWidth) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const W   = canvas.width  / dpr;
-    const H   = canvas.height / dpr;
 
-    const iR = img.naturalWidth  / img.naturalHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.width / dpr;
+    const H = canvas.height / dpr;
+
+    const iR = img.naturalWidth / img.naturalHeight;
     const cR = W / H;
-    let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
-    if (iR > cR) { sw = img.naturalHeight * cR; sx = (img.naturalWidth  - sw) / 2; }
-    else          { sh = img.naturalWidth  / cR; sy = (img.naturalHeight - sh) / 2; }
+    let sx = 0;
+    let sy = 0;
+    let sw = img.naturalWidth;
+    let sh = img.naturalHeight;
+
+    if (iR > cR) {
+      sw = img.naturalHeight * cR;
+      sx = (img.naturalWidth - sw) / 2;
+    } else {
+      sh = img.naturalWidth / cR;
+      sy = (img.naturalHeight - sh) / 2;
+    }
 
     ctx.clearRect(0, 0, W, H);
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
   }, []);
 
-  /* ── RAF render loop ─────────────────────────── */
-  const lastScrollTime  = useRef(Date.now());
-  const autoPhase       = useRef<'fwd' | 'pauseEnd' | 'rew' | 'pauseStart'>('fwd');
-  const pauseStart      = useRef(0);
+  const lastScrollTime = useRef(Date.now());
+  const autoPlayPhase = useRef<'forward' | 'pauseEnd' | 'rewind' | 'pauseStart'>('forward');
+  const pauseStartTime = useRef(0);
 
   const renderLoop = useCallback(() => {
-    const s   = stateRef.current;
+    const s = stateRef.current;
     const now = Date.now();
-    if (now - lastScrollTime.current > 2500) {
-      if (autoPhase.current === 'fwd') {
-        s.targetFrame += 0.2;
-        if (s.targetFrame >= TOTAL_FRAMES - 1) { s.targetFrame = TOTAL_FRAMES - 1; autoPhase.current = 'pauseEnd'; pauseStart.current = now; }
-      } else if (autoPhase.current === 'pauseEnd') {
-        if (now - pauseStart.current > 1200) autoPhase.current = 'rew';
-      } else if (autoPhase.current === 'rew') {
-        s.targetFrame -= 1.2;
-        if (s.targetFrame <= 0) { s.targetFrame = 0; autoPhase.current = 'pauseStart'; pauseStart.current = now; }
-      } else {
-        if (now - pauseStart.current > 2000) autoPhase.current = 'fwd';
+
+    if (now - lastScrollTime.current > 3000) {
+      if (autoPlayPhase.current === 'forward') {
+        s.targetFrame += 0.25;
+        if (s.targetFrame >= HERO_TOTAL_FRAMES - 1) {
+          s.targetFrame = HERO_TOTAL_FRAMES - 1;
+          autoPlayPhase.current = 'pauseEnd';
+          pauseStartTime.current = now;
+        }
+      } else if (autoPlayPhase.current === 'pauseEnd') {
+        if (now - pauseStartTime.current > 1500) {
+          autoPlayPhase.current = 'rewind';
+        }
+      } else if (autoPlayPhase.current === 'rewind') {
+        s.targetFrame -= 1.5;
+        if (s.targetFrame <= 0) {
+          s.targetFrame = 0;
+          autoPlayPhase.current = 'pauseStart';
+          pauseStartTime.current = now;
+        }
+      } else if (autoPlayPhase.current === 'pauseStart') {
+        if (now - pauseStartTime.current > 2500) {
+          autoPlayPhase.current = 'forward';
+        }
       }
-    } else { autoPhase.current = 'fwd'; }
+    } else {
+      autoPlayPhase.current = 'forward';
+    }
 
     const delta = s.targetFrame - s.currentFrame;
-    if (Math.abs(delta) > 0.01) s.currentFrame += delta * LERP_SPEED;
+    if (Math.abs(delta) > 0.01) {
+      s.currentFrame += delta * LERP_SPEED;
+    }
     if (s.isReady) drawFrame(s.currentFrame);
     s.rafId = requestAnimationFrame(renderLoop);
   }, [drawFrame]);
 
-  /* ── Scroll handler ──────────────────────────── */
   const handleScroll = useCallback(() => {
     lastScrollTime.current = Date.now();
+
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     let track: HTMLElement | null = canvas.parentElement;
-    while (track && !track.classList.contains(SCROLL_TRACK_CLASS)) track = track.parentElement;
+    while (track && !track.classList.contains(SCROLL_TRACK_CLASS)) {
+      track = track.parentElement;
+    }
     if (!track) return;
-    const rect    = track.getBoundingClientRect();
-    const totalH  = track.offsetHeight - window.innerHeight;
+
+    const rect = track.getBoundingClientRect();
+    const totalH = track.offsetHeight - window.innerHeight;
     if (totalH <= 0) return;
+
     const scrolled = Math.max(0, -rect.top);
-    stateRef.current.targetFrame = (Math.min(1, scrolled / totalH)) * (TOTAL_FRAMES - 1);
+    const progress = Math.min(1, scrolled / totalH);
+    stateRef.current.targetFrame = 22 + progress * (HERO_TOTAL_FRAMES - 1 - 22); // CHANGE START FRAME HERE
   }, []);
 
-  /* ── Canvas resize ───────────────────────────── */
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const dpr = window.devicePixelRatio || 1;
-    const W   = canvas.parentElement?.offsetWidth  || window.innerWidth;
-    const H   = canvas.parentElement?.offsetHeight || window.innerHeight;
-    canvas.width        = W * dpr;
-    canvas.height       = H * dpr;
-    canvas.style.width  = `${W}px`;
+    const W = canvas.parentElement?.offsetWidth || window.innerWidth;
+    const H = canvas.parentElement?.offsetHeight || window.innerHeight;
+
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = `${W}px`;
     canvas.style.height = `${H}px`;
-    canvas.getContext('2d')?.scale(dpr, dpr);
+
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+    }
+
     drawFrame(Math.round(stateRef.current.currentFrame));
   }, [drawFrame]);
 
-  /* ── Lifecycle ───────────────────────────────── */
   useEffect(() => {
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const savedFrame = Math.round(stateRef.current.targetFrame);
+
     resizeCanvas();
-    imagesRef.current  = new Array(TOTAL_FRAMES).fill(null);
+    imagesRef.current = new Array(HERO_TOTAL_FRAMES).fill(null);
     stateRef.current.loadedCount = 0;
-    stateRef.current.isReady     = false;
-    preloadFrames(frameUrls);
+    stateRef.current.isReady = false;
+    preloadFrames(frameUrls).then(() => {
+      stateRef.current.currentFrame = savedFrame;
+      stateRef.current.targetFrame = savedFrame;
+      drawFrame(savedFrame);
+    });
 
     if (!prefersReduced) {
       stateRef.current.rafId = requestAnimationFrame(renderLoop);
     } else {
       const img = new Image();
-      img.src = frameUrls[0];
-      img.onload = () => { imagesRef.current[0] = img; stateRef.current.isReady = true; drawFrame(0); };
+      const firstUrl = frameUrls[0] ?? '';
+      img.src = firstUrl;
+      img.onload = () => {
+        imagesRef.current[0] = img;
+        stateRef.current.isReady = true;
+        drawFrame(savedFrame);
+      };
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('resize', resizeCanvas);
+    handleScroll();
+
     const state = stateRef.current;
+
     return () => {
-      cancelAnimationFrame(state.rafId);
+      if (state.rafId) cancelAnimationFrame(state.rafId);
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', resizeCanvas);
     };
-  }, [preloadFrames, renderLoop, handleScroll, resizeCanvas, drawFrame, frameUrls]);
+  }, [preloadFrames, renderLoop, handleScroll, resizeCanvas, drawFrame, frameUrls, theme]);
 
   return (
     <canvas
       ref={canvasRef}
       aria-hidden="true"
-      style={{ display: 'block', width: '100%', height: '100%' }}
+      className="hero-frame-canvas"
+      data-theme={theme}
     />
   );
 }

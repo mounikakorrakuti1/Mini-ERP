@@ -239,7 +239,7 @@ export default function AnalyticsPage() {
               style={{ appearance: 'auto', padding: '2px 8px', fontSize: 'var(--text-xs)', minWidth: '150px' }}
             >
               {products.map(p => (
-                <option key={p.id} value={p.id}>{p.code}</option>
+                <option key={p.id} value={p.id}>{p.reference}</option>
               ))}
             </select>
           </div>

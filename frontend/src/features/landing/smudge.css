@@ -1,0 +1,86 @@
+.smudge-revealer-section {
+  position: relative;
+  width: 100%;
+  height: 50vh;
+  min-height: 400px;
+  background: #1a1a1a;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-2xl);
+  user-select: none;
+}
+
+.smudge-container {
+  position: relative;
+  width: 100%;
+  max-width: var(--max-w-2xl);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  z-index: 2;
+}
+
+.smudge-text-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.smudge-main-text {
+  font-family: var(--font-display);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+  color: #F4F1DE;
+  font-size: clamp(4rem, 15vw, 12rem);
+  margin: 0;
+  pointer-events: none;
+}
+
+.smudge-reveal-layer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #C4D6B0;
+  mask: url(#smudge-mask);
+  -webkit-mask: url(#smudge-mask);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.smudge-desc-text {
+  font-family: var(--font-display);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: #111;
+  font-size: clamp(2rem, 8vw, 5rem);
+  max-width: 80%;
+  margin: 0;
+  text-align: center;
+}
+
+.smudge-revealer-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.smudge-blobs {
+  fill: white;
+}

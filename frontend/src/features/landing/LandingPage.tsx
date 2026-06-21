@@ -1,250 +1,419 @@
-import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/routes/routeMap';
+import { useThemeStore } from '@/store/theme.store';
+import { usd } from './format';
 import {
-  Factory, Package, ShoppingCart, Truck, Boxes,
-  BarChart3, Workflow, ArrowRight, CheckCircle2, ChevronRight,
-  Heart, Command
+  Armchair,
+  Banknote,
+  BedDouble,
+  Hammer,
+  Heart,
+  LampFloor,
+  Moon,
+  PackageCheck,
+  Palette,
+  PencilRuler,
+  Ruler,
+  ShoppingBag,
+  Sofa,
+  Sparkles,
+  Sun,
+  Truck,
+  Warehouse,
+  type LucideIcon,
 } from 'lucide-react';
+import './landing.css';
 import HeroFrameCanvas from './HeroFrameCanvas';
+
 import MosaicCarousel from './MosaicCarousel';
 import SmudgeRevealer from './SmudgeRevealer';
-import './landing.css';
 
-/* ── Data ─────────────────────────────────────────────────── */
 const features = [
   {
-    icon: Package,
+    icon: Sofa,
     variant: 'feature-icon-peach',
-    title: 'Product Catalogue',
-    desc: 'Manage your complete product library with categories, pricing, BOMs, and procurement routes in one place.',
+    title: 'Room-wise Collections',
+    desc: 'Browse coordinated sofas, beds, tables, and storage pieces designed to work together across every room.',
   },
   {
-    icon: ShoppingCart,
-    variant: 'feature-icon-teal',
-    title: 'Sales Order Management',
-    desc: 'Create, confirm, and deliver sales orders with automatic stock reservation and customer tracking.',
-  },
-  {
-    icon: Truck,
+    icon: Banknote,
     variant: 'feature-icon-warm',
-    title: 'Purchase Orders',
-    desc: 'Streamline vendor procurement. Raise POs, track deliveries, and auto-receive stock with full audit trails.',
+    title: 'Transparent Pricing',
+    desc: 'Compare materials, finishes, delivery costs, and installation options before you place an order.',
   },
   {
-    icon: Factory,
+    icon: Ruler,
+    variant: 'feature-icon-teal',
+    title: 'Size & Fit Guidance',
+    desc: 'Check dimensions, room fit, and layout notes so every piece feels intentional at home.',
+  },
+  {
+    icon: Palette,
     variant: 'feature-icon-peach',
-    title: 'Manufacturing',
-    desc: 'Drive production from Bill of Materials. Schedule, start, and complete orders with component consumption.',
+    title: 'Finish Studio',
+    desc: 'Choose fabrics, wood tones, hardware, and color palettes that match your interior style.',
   },
   {
-    icon: Boxes,
+    icon: Warehouse,
     variant: 'feature-icon-teal',
-    title: 'Inventory & Ledger',
-    desc: 'Real-time stock visibility with movement ledger, reorder alerts, and reconciliation reporting.',
+    title: 'Live Inventory',
+    desc: 'See what is ready to ship, what can be customized, and when workshop-made pieces will arrive.',
   },
   {
-    icon: Workflow,
+    icon: Sparkles,
     variant: 'feature-icon-warm',
-    title: 'Smart Procurement',
-    desc: 'AI-powered demand forecasting, low-stock alerts, and auto-recommendation engine for purchasing.',
+    title: 'Style Suggestions',
+    desc: 'Get personalized furniture pairings and decor ideas based on your room, budget, and taste.',
   },
 ];
 
 const steps = [
-  { num: '01', icon: Package, title: 'Add your products',    desc: 'Define your catalogue, pricing, and BOMs in minutes.' },
-  { num: '02', icon: ShoppingCart, title: 'Raise an order', desc: 'Create sales or purchase orders with one click.' },
-  { num: '03', icon: Factory, title: 'Manufacture & stock', desc: 'Trigger production, track progress, auto-update inventory.' },
-  { num: '04', icon: BarChart3, title: 'Analyze & grow',    desc: 'Live dashboards and drill-down analytics for every module.' },
+  { num: '01', icon: Armchair, title: 'Pick your room', desc: 'Start with living, dining, bedroom, or workspace needs.' },
+  { num: '02', icon: PencilRuler, title: 'Match the fit', desc: 'Review dimensions, finishes, and layout-friendly options.' },
+  { num: '03', icon: ShoppingBag, title: 'Customize & order', desc: 'Choose materials, confirm pricing, and reserve stock.' },
+  { num: '04', icon: Truck, title: 'Deliver & install', desc: 'Track delivery, assembly, and after-care from one place.' },
 ];
 
-export default function LandingPage() {
-  const [scrolled, setScrolled] = useState(false);
-  const navRef = useRef<HTMLElement>(null);
+const testimonials = [
+  {
+    stars: '*****',
+    text: 'Furnexa made furnishing our apartment feel simple. The coordinated room sets saved us weeks of browsing.',
+    name: 'Priya Sharma',
+    role: 'New Homeowner',
+  },
+  {
+    stars: '*****',
+    text: 'The pricing and delivery timeline were clear from the start. Our dining table arrived exactly as promised.',
+    name: 'Arjun Mehta',
+    role: 'Interior Client',
+  },
+  {
+    stars: '****+',
+    text: 'I loved being able to compare fabrics and wood finishes before ordering a custom sofa for my studio.',
+    name: 'Divya Reddy',
+    role: 'Studio Owner',
+  },
+];
 
-  useEffect(() => {
-    const onScroll = () => {
-      setScrolled(window.scrollY > 60);
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+
+
+function BrandLogo() {
+  return (
+    <span className="landing-logo-text" style={{ fontFamily: 'Flexing, sans-serif', letterSpacing: '0.08em' }}>
+      <Armchair
+        size={28}
+        style={{
+          display: 'inline-block',
+          marginInlineEnd: '8px',
+          verticalAlign: 'middle',
+          color: 'var(--cl-accent)',
+        }}
+      />
+      Furnexa
+    </span>
+  );
+}
+
+export default function LandingPage() {
+  const { theme, toggleTheme } = useThemeStore();
 
   return (
-    <div className="furnexa-landing">
-      {/* ── Navbar ──────────────────────────────────────────── */}
-      <nav ref={navRef} className={`landing-navbar ${scrolled ? '' : 'landing-navbar-hero'}`}>
-        <div className="landing-nav-logo">
-          <div className="landing-logo-mark">F</div>
-          <span className="landing-logo-text">Furnexa</span>
-        </div>
-        <div className="landing-nav-links">
-          <a href="#features"    className="landing-nav-link">Features</a>
-          <a href="#how-it-works" className="landing-nav-link">Process</a>
-          <a href="#visuals"      className="landing-nav-link">Visuals</a>
-        </div>
-        <div className="landing-nav-actions">
-          <Link to={ROUTES.LOGIN} className="btn btn--primary" style={{ padding: '8px 16px', borderRadius: '8px', background: 'var(--cl-accent)', color: '#fff', fontSize: '0.875rem' }}>
-            Sign In
-          </Link>
-          <Link to={ROUTES.SIGNUP} className="btn btn--primary" style={{ padding: '8px 16px', borderRadius: '8px', background: 'var(--cl-warm)', color: '#111', fontSize: '0.875rem' }}>
-            Get Started
-          </Link>
-        </div>
-      </nav>
-
-      {/* ── Cinematic Hero ────────────────────────────────────── */}
-      <div className="hero-scroll-track">
+    <div className="traveloop-landing" style={{ background: 'var(--cl-bg)' }}>
+      <div className="hero-scroll-track" style={{ height: '600vh' }}>
         <section className="landing-hero hero-sticky">
-          <div className="hero-canvas-bg">
-            <HeroFrameCanvas />
-          </div>
-          <div className="hero-canvas-scrim" />
+          <div className="landing-navbar landing-navbar-hero">
+            <Link to={ROUTES.LANDING} className="landing-nav-logo">
+              <BrandLogo />
+            </Link>
 
-          {/* New specific text overlay layout */}
-          <div className="hero-text-overlay">
-            <div className="hero-overlay-eyebrow">
-              <span className="hero-badge-dot" style={{ background: 'currentColor', marginRight: 8, width: 6, height: 6, borderRadius: '50%' }} />
-              Enterprise ERP Ready
+            <div className="landing-nav-links">
+              <a href="#features" className="landing-nav-link">
+                Features
+              </a>
+              <a href="#how-it-works" className="landing-nav-link">
+                How it works
+              </a>
+              <a href="#collections" className="landing-nav-link">
+                Collections
+              </a>
             </div>
-            <h1 className="hero-overlay-title">
-              Run your entire business on <br />
-              <span className="hero-overlay-accent">Furnexa</span>
-            </h1>
-            <p className="hero-overlay-desc">
-              A modern, integrated ERP system for manufacturing. Manage products, orders, inventory, procurement, and teams in one place.
-            </p>
-            <div className="hero-overlay-cta">
-              <Link to={ROUTES.SIGNUP} className="hero-cta-primary" style={{ padding: '12px 24px', background: 'var(--cl-accent)', color: '#fff', borderRadius: '8px', fontWeight: 600 }}>
-                Start Free <ArrowRight size={16} style={{ marginLeft: 8, display: 'inline' }} />
-              </Link>
-              <Link to={ROUTES.LOGIN} className="hero-cta-secondary" style={{ padding: '12px 24px', background: 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: '8px', fontWeight: 600, border: '1px solid rgba(255,255,255,0.2)' }}>
+
+            <div className="landing-nav-actions">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="landing-theme-toggle"
+                aria-label="Toggle theme"
+              >
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <Link
+                to={ROUTES.LOGIN}
+                className="btn btn-ghost btn-sm"
+                style={{ color: 'var(--cl-text-muted)' }}
+              >
                 Sign In
               </Link>
+              <Link to={ROUTES.SIGNUP} className="btn btn-primary btn-sm">
+                Sign Up
+              </Link>
             </div>
+          </div>
+
+          <div className="hero-canvas-bg">
+            <HeroFrameCanvas />
           </div>
 
           <div className="hero-scroll-hint" aria-label="Scroll to explore">
             <div className="scroll-mouse">
               <div className="scroll-mouse-wheel" />
             </div>
-            <span className="scroll-mouse-label">Scroll down</span>
+            <span className="scroll-mouse-label">Scroll to explore</span>
           </div>
         </section>
       </div>
 
-      {/* ── Features ─────────────────────────────────────────── */}
-      <section id="features" className="landing-section">
-        <div className="landing-section-header">
-          <div className="landing-section-label">Everything you need</div>
-          <h2 className="landing-section-title">Your complete business operations toolkit</h2>
-          <p className="landing-section-desc">
-            From raw materials to delivered goods — Furnexa covers every stage of your supply chain with precision and elegance.
-          </p>
-        </div>
-        <div className="features-grid">
-          {features.map((f, i) => (
-            <div key={i} className="feature-card">
-              <div className={`feature-icon ${f.variant}`}>
-                <f.icon size={26} />
-              </div>
-              <h3 className="feature-title">{f.title}</h3>
-              <p className="feature-desc">{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* <MosaicCarousel /> */}
+      {/* <SmudgeRevealer /> */}
 
-      {/* ── Smudge Revealer Section ──────────────────────────── */}
-      <SmudgeRevealer />
-
-      {/* ── How It Works ─────────────────────────────────────── */}
-      <section id="how-it-works" className="landing-section">
-        <div className="how-section">
-          <div className="landing-section-header" style={{ marginBottom: 40, textAlign: 'left', maxWidth: '100%' }}>
-            <div className="landing-section-label">Process</div>
-            <h2 className="landing-section-title" style={{ color: '#fff' }}>From zero to running in 4 steps</h2>
+      <section id="features" style={{ padding: 'var(--sp-3xl) var(--sp-xl)', background: 'var(--cl-bg)' }}>
+        <div style={{ maxWidth: 'var(--max-w-2xl)', margin: '0 auto' }}>
+          <div className="landing-section-header">
+            <div className="landing-section-label">Everything you need</div>
+            <h2 className="landing-section-title">Your complete furniture shopping toolkit</h2>
+            <p className="landing-section-desc">
+              From first moodboard to final installation, Furnexa helps you choose pieces that
+              fit your space, style, and budget.
+            </p>
           </div>
-          <div className="how-steps">
-            {steps.map((s, i) => (
-              <div key={i} className="how-step">
-                <div className="how-step-num">{s.num}</div>
-                <div className="how-step-icon">
-                  <s.icon size={24} color="#F2CC8F" />
+
+          <div className="features-grid">
+            {features.map((f) => (
+              <div key={f.title} className="feature-card">
+                <div className={`feature-icon ${f.variant}`}>
+                  <f.icon size={28} />
                 </div>
-                <div className="how-step-title">{s.title}</div>
-                <div className="how-step-desc">{s.desc}</div>
+                <h3 className="feature-title">{f.title}</h3>
+                <p className="feature-desc">{f.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Mosaic Carousel Section ──────────────────────────── */}
-      <div id="visuals">
-        <MosaicCarousel />
-      </div>
+      <section id="how-it-works" style={{ padding: '0 var(--sp-xl) var(--sp-3xl)' }}>
+        <div style={{ maxWidth: 'var(--max-w-2xl)', margin: '0 auto' }}>
+          <div className="how-section">
+            <div className="landing-section-header" style={{ marginBottom: 'var(--sp-xl)' }}>
+              <div className="landing-section-label" style={{ color: 'var(--cl-warm)' }}>
+                Simple process
+              </div>
+              <h2 className="landing-section-title" style={{ color: 'var(--cl-text-on-surface)' }}>
+                Furnish your space in 4 easy steps
+              </h2>
+            </div>
 
-      {/* ── CTA ──────────────────────────────────────────────── */}
-      <section className="landing-section">
-        <div className="cta-section">
-          <h2 className="cta-title">Ready to streamline your operations?</h2>
-          <p className="cta-desc">
-            Join manufacturing teams already running smarter with Furnexa. Set up your workspace in minutes.
-          </p>
-          <div className="cta-actions">
-            <Link to={ROUTES.SIGNUP} className="btn btn--primary" style={{ padding: '14px 32px', fontSize: '1rem', background: '#F2CC8F', color: '#111', borderRadius: '12px' }}>
-              Get Started Free <ArrowRight size={18} />
-            </Link>
+            <div className="how-steps">
+              {steps.map((s) => (
+                <div key={s.num} className="how-step">
+                  <div className="how-step-num">{s.num}</div>
+                  <div className="how-step-icon">
+                    <s.icon size={32} />
+                  </div>
+                  <div>
+                    <div className="how-step-title">{s.title}</div>
+                    <div className="how-step-desc">{s.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── Footer ───────────────────────────────────────────── */}
+
+
+      <section style={{ padding: '0 var(--sp-xl) var(--sp-3xl)', background: 'var(--cl-bg-alt)' }}>
+        <div style={{ maxWidth: 'var(--max-w-2xl)', margin: '0 auto', paddingTop: 'var(--sp-3xl)' }}>
+          <div className="landing-section-header">
+            <div className="landing-section-label">Social proof</div>
+            <h2 className="landing-section-title">What customers say</h2>
+          </div>
+
+          <div className="testimonials-grid">
+            {testimonials.map((t) => (
+              <div key={t.name} className="testimonial-card">
+                <div className="testimonial-stars">{t.stars}</div>
+                <p className="testimonial-text">{t.text}</p>
+                <div className="testimonial-author">
+                  <div className="avatar avatar-sm">{t.name[0]}</div>
+                  <div>
+                    <div className="testimonial-author-name">{t.name}</div>
+                    <div className="testimonial-author-role">{t.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section style={{ padding: 'var(--sp-3xl) var(--sp-xl)' }}>
+        <div style={{ maxWidth: 'var(--max-w-2xl)', margin: '0 auto' }}>
+          <div className="cta-section">
+            <h2 className="cta-title">Ready to furnish your next room?</h2>
+            <p className="cta-desc">
+              Join Furnexa customers who shop smarter with curated collections, clear pricing,
+              and delivery support from selection to setup.
+            </p>
+            <div className="cta-actions">
+              <Link
+                to={ROUTES.SIGNUP}
+                className="btn btn-lg"
+                style={{
+                  background: 'var(--cl-text-on-surface)',
+                  color: 'var(--cl-accent)',
+                  fontWeight: 'var(--fw-bold)',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                }}
+              >
+                Get Started
+              </Link>
+              <Link
+                to={ROUTES.LOGIN}
+                className="btn btn-lg"
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  color: 'var(--cl-text-on-surface)',
+                  border: '1.5px solid rgba(255,255,255,0.3)',
+                }}
+              >
+                Sign In
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <footer className="landing-footer">
         <div className="footer-inner">
           <div>
-            <div className="landing-nav-logo">
-              <div className="landing-logo-mark">F</div>
-              <span className="landing-logo-text">Furnexa</span>
-            </div>
+            <Link
+              to={ROUTES.LANDING}
+              className="landing-nav-logo"
+              style={{ marginBottom: 'var(--sp-md)', textDecoration: 'none' }}
+            >
+              <BrandLogo />
+            </Link>
             <p className="footer-brand-desc">
-              The all-in-one ERP platform for modern manufacturing and distribution. Plan, produce, and deliver — all in one place.
+              The all-in-one furniture platform for modern homes. Discover, customize, order,
+              and install pieces made for real living.
             </p>
           </div>
+
           <div>
             <div className="footer-col-title">Product</div>
             <ul className="footer-links">
-              <li><a href="#features">Features</a></li>
-              <li><a href="#how-it-works">How it works</a></li>
-              <li><Link to={ROUTES.LOGIN}>Sign In</Link></li>
+              <li>
+                <a href="#features">Features</a>
+              </li>
+              <li>
+                <a href="#how-it-works">How it works</a>
+              </li>
+              <li>
+                <Link to={ROUTES.LOGIN}>Sign In</Link>
+              </li>
+              <li>
+                <Link to={ROUTES.SIGNUP}>Get Started</Link>
+              </li>
             </ul>
           </div>
+
           <div>
-            <div className="footer-col-title">Platform</div>
+            <div className="footer-col-title">Shop</div>
             <ul className="footer-links">
-              <li><a href="#features">Inventory</a></li>
-              <li><a href="#features">Manufacturing</a></li>
-              <li><a href="#features">Procurement</a></li>
+              <li>
+                <a href="#collections">Collections</a>
+              </li>
+              <li>
+                <a href="#features">Room Collections</a>
+              </li>
+              <li>
+                <a href="#features">Transparent Pricing</a>
+              </li>
+              <li>
+                <a href="#features">Style Suggestions</a>
+              </li>
             </ul>
           </div>
+
           <div>
             <div className="footer-col-title">Company</div>
             <ul className="footer-links">
-              <li><a href="#">About</a></li>
-              <li><a href="#">Privacy Policy</a></li>
-              <li><a href="#">Terms of Service</a></li>
+              <li>
+                <a href="#">About</a>
+              </li>
+              <li>
+                <a href="#">Privacy Policy</a>
+              </li>
+              <li>
+                <a href="#">Terms of Service</a>
+              </li>
+              <li>
+                <a href="#">Contact</a>
+              </li>
             </ul>
           </div>
         </div>
+
         <div className="footer-bottom">
           <span className="footer-copy">
-            © {new Date().getFullYear()} Furnexa. Made with <Heart size={12} style={{ display: 'inline', color: 'var(--cl-accent)' }} /> for manufacturers.
+            © {new Date().getFullYear()} Furnexa. Made with{' '}
+            <Heart
+              size={12}
+              fill="var(--cl-accent)"
+              color="var(--cl-accent)"
+              style={{ display: 'inline-block', margin: '0 2px' }}
+            />{' '}
+            for beautiful homes.
           </span>
-          <div className="footer-social-links" style={{ display: 'flex', gap: 16 }}>
-            <a href="#" style={{ color: 'var(--cl-text-muted)', fontSize: 13 }}>Twitter</a>
-            <a href="#" style={{ color: 'var(--cl-text-muted)', fontSize: 13 }}>LinkedIn</a>
-            <a href="#" style={{ color: 'var(--cl-text-muted)', fontSize: 13 }}>GitHub</a>
+          <div style={{ display: 'flex', gap: 'var(--sp-md)' }}>
+            <a
+              href="#"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--sp-xs)',
+                fontSize: 'var(--fs-xs)',
+                color: 'var(--text-muted)',
+              }}
+            >
+              Twitter
+            </a>
+            <a
+              href="#"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--sp-xs)',
+                fontSize: 'var(--fs-xs)',
+                color: 'var(--text-muted)',
+              }}
+            >
+              Instagram
+            </a>
+            <a
+              href="#"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--sp-xs)',
+                fontSize: 'var(--fs-xs)',
+                color: 'var(--text-muted)',
+              }}
+            >
+              LinkedIn
+            </a>
           </div>
         </div>
       </footer>
