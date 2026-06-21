@@ -14,7 +14,7 @@ export function ProductForm({ initialData, onSubmit, onCancel }: ProductFormProp
 
   // ─── Local State ─────────────────────────────────────────────────
   const [name, setName] = useState(initialData?.name ?? '');
-  const [code, setCode] = useState(initialData?.code ?? '');
+  const [reference, setReference] = useState(initialData?.reference ?? '');
   const [category, setCategory] = useState<'Raw Material' | 'Finished Good' | 'Service'>(
     initialData?.category ?? 'Raw Material'
   );
@@ -61,7 +61,7 @@ export function ProductForm({ initialData, onSubmit, onCancel }: ProductFormProp
 
     const formData: ProductFormData = {
       name,
-      code,
+      reference,
       category,
       salesPrice: parseFloat(salesPrice) || 0,
       costPrice: parseFloat(costPrice) || 0,
@@ -95,14 +95,14 @@ export function ProductForm({ initialData, onSubmit, onCancel }: ProductFormProp
           <input
             type="text"
             className="input-field"
-            value={code}
+            value={reference}
             onChange={(e) => {
-              setCode(e.target.value);
-              if (errors.code) setErrors(prev => ({ ...prev, code: undefined }));
+              setReference(e.target.value);
+              if (errors.reference) setErrors(prev => ({ ...prev, reference: undefined }));
             }}
             placeholder="e.g. TEAK-WOOD-PLK"
           />
-          {errors.code && <span className="text-xs" style={{ color: 'var(--status-danger)' }}>{errors.code}</span>}
+          {errors.reference && <span className="text-xs" style={{ color: 'var(--status-danger)' }}>{errors.reference}</span>}
         </div>
 
         {/* Name */}

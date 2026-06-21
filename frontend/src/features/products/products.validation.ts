@@ -1,6 +1,6 @@
 export interface ProductFormErrors {
   name?: string;
-  code?: string;
+  reference?: string;
   salesPrice?: string;
   costPrice?: string;
   reorderPoint?: string;
@@ -11,7 +11,7 @@ export interface ProductFormErrors {
 
 export interface ProductFormData {
   name: string;
-  code: string;
+  reference: string;
   category: 'Raw Material' | 'Finished Good' | 'Service';
   salesPrice: number;
   costPrice: number;
@@ -28,8 +28,8 @@ export function validateProduct(data: ProductFormData) {
   if (!data.name || !data.name.trim()) {
     errors.name = 'Product name is required';
   }
-  if (!data.code || !data.code.trim()) {
-    errors.code = 'Product code is required';
+  if (!data.reference || !data.reference.trim()) {
+    errors.reference = 'Product code/reference is required';
   }
   if (isNaN(data.salesPrice) || data.salesPrice < 0) {
     errors.salesPrice = 'Sales price must be 0 or greater';

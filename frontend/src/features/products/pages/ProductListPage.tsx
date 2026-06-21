@@ -1,59 +1,81 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDb } from '@/store/db.store';
 import { useAuthStore } from '@/store/auth.store';
 import { hasPermission } from '@/lib/permissions';
 import { MODULE, PERMISSION_ACTION } from '@/types/enums';
-import { Plus, Search, Package, AlertTriangle, ArrowUpDown, Eye, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Package, AlertTriangle, ArrowUpDown, Eye, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ROUTES } from '@/routes/routeMap';
 import { api } from '@/lib/api';
 
 export default function ProductListPage() {
   const navigate = useNavigate();
-  const { products, refreshData } = useDb();
+  const { refreshData } = useDb();
   const { user } = useAuthStore();
+
+  const [products, setProducts] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const limit = 50;
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [procurementFilter, setProcurementFilter] = useState<string>('ALL');
-  const [sortField, setSortField] = useState<'code' | 'name' | 'salesPrice' | 'costPrice' | 'freeToUse'>('code');
+  const [sortField, setSortField] = useState<'reference' | 'name' | 'salesPrice' | 'costPrice' | 'freeToUse'>('reference');
   const [sortAsc, setSortAsc] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const canCreate = hasPermission(user?.permissions, MODULE.PRODUCTS, PERMISSION_ACTION.ADMIN);
   const canEdit = hasPermission(user?.permissions, MODULE.PRODUCTS, PERMISSION_ACTION.ADMIN);
 
-  const filteredProducts = products
-    .filter((p) => {
-      const query = search.toLowerCase();
-      const matchesSearch = p.name.toLowerCase().includes(query) || p.code.toLowerCase().includes(query);
-      const matchesCategory = categoryFilter === 'ALL' || p.category === categoryFilter;
-      const matchesProcurement =
-        procurementFilter === 'ALL' ||
-        (procurementFilter === 'PURCHASE' && p.procurementType === 'PURCHASE') ||
-        (procurementFilter === 'MANUFACTURING' && p.procurementType === 'MANUFACTURING') ||
-        (procurementFilter === 'STOCKED' && !p.procureOnDemand);
-      const isLow = p.freeToUse < p.reorderPoint;
-      const matchesStatus =
-        statusFilter === 'ALL' ||
-        (statusFilter === 'LOW' && isLow && p.freeToUse > 0) ||
-        (statusFilter === 'OUT' && p.freeToUse <= 0) ||
-        (statusFilter === 'OK' && !isLow);
-      return matchesSearch && matchesCategory && matchesProcurement && matchesStatus;
-    })
-    .sort((a, b) => {
-      const valA = a[sortField];
-      const valB = b[sortField];
-      if (typeof valA === 'string' && typeof valB === 'string') return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
-      if (typeof valA === 'number' && typeof valB === 'number') return sortAsc ? valA - valB : valB - valA;
-      return 0;
-    });
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get('/products', {
+        params: {
+          search,
+          category: categoryFilter,
+          status: statusFilter,
+          procurementFilter,
+          page,
+          limit
+        }
+      });
+      setProducts(res.data.data);
+      setTotal(res.data.meta.total);
+    } catch (err) {
+      console.error('Failed to fetch products', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [search, categoryFilter, statusFilter, procurementFilter, page]);
+
+  useEffect(() => {
+    // Reset to page 1 when filters change
+    setPage(1);
+  }, [search, categoryFilter, statusFilter, procurementFilter]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts();
+    }, 300); // debounce search
+    return () => clearTimeout(timer);
+  }, [fetchProducts]);
 
   const handleSort = (field: typeof sortField) => {
     if (sortField === field) setSortAsc(!sortAsc);
     else { setSortField(field); setSortAsc(true); }
   };
+
+  const sortedProducts = [...products].sort((a, b) => {
+    const valA = a[sortField];
+    const valB = b[sortField];
+    if (typeof valA === 'string' && typeof valB === 'string') return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    if (typeof valA === 'number' && typeof valB === 'number') return sortAsc ? valA - valB : valB - valA;
+    return 0;
+  });
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -62,6 +84,7 @@ export default function ProductListPage() {
     try {
       await api.delete(`/products/${id}`);
       await refreshData();
+      fetchProducts();
     } catch (err) {
       alert('Failed to delete product.');
     } finally {
@@ -69,9 +92,9 @@ export default function ProductListPage() {
     }
   };
 
-  const getStockStatus = (p: typeof products[0]) => {
-    if (p.freeToUse <= 0) return { label: 'Out of Stock', color: 'var(--status-danger)', bg: 'rgba(229,62,62,0.1)' };
-    if (p.freeToUse < p.reorderPoint) return { label: 'Low Stock', color: 'var(--status-warning)', bg: 'rgba(221,107,32,0.1)' };
+  const getStockStatus = (p: any) => {
+    if (p.available <= 0) return { label: 'Out of Stock', color: 'var(--status-danger)', bg: 'rgba(229,62,62,0.1)' };
+    if (p.available < p.reorderPoint) return { label: 'Low Stock', color: 'var(--status-warning)', bg: 'rgba(221,107,32,0.1)' };
     return { label: 'In Stock', color: 'var(--status-success)', bg: 'rgba(56,161,105,0.1)' };
   };
 
@@ -95,7 +118,7 @@ export default function ProductListPage() {
             <Package size={28} color="var(--accent-main)" /> Product Catalog
           </h1>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            {products.length} products · {products.filter(p => p.freeToUse < p.reorderPoint).length} need attention
+            {total} products total in catalog
           </p>
         </div>
         {canCreate && (
@@ -113,9 +136,9 @@ export default function ProductListPage() {
         </div>
         <select className="input-field" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ appearance: 'auto', padding: '0.4rem var(--space-sm)', minWidth: '140px' }}>
           <option value="ALL">All Categories</option>
-          <option value="Raw Material">Raw Materials</option>
-          <option value="Finished Good">Finished Goods</option>
-          <option value="Service">Services</option>
+          <option value="RAW_MATERIAL">Raw Materials</option>
+          <option value="FINISHED_GOOD">Finished Goods</option>
+          <option value="SERVICE">Services</option>
         </select>
         <select className="input-field" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ appearance: 'auto', padding: '0.4rem var(--space-sm)', minWidth: '130px' }}>
           <option value="ALL">All Status</option>
@@ -129,9 +152,17 @@ export default function ProductListPage() {
           <option value="PURCHASE">Purchase</option>
           <option value="MANUFACTURING">Manufacturing</option>
         </select>
-        <span className="text-xs" style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-          {filteredProducts.length} / {products.length} shown
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', marginLeft: 'auto' }}>
+          <button className="btn btn--icon" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+            <ChevronLeft size={16} />
+          </button>
+          <span className="text-xs" style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+            Page {page}
+          </span>
+          <button className="btn btn--icon" disabled={products.length < limit} onClick={() => setPage(p => p + 1)}>
+            <ChevronRight size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Table */}
@@ -139,14 +170,14 @@ export default function ProductListPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1100px' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid var(--border-main)', backgroundColor: 'var(--bg-app)' }}>
-              <SortTh field="code" label="SKU Code" />
+              <SortTh field="reference" label="SKU Code" />
               <SortTh field="name" label="Product Name" />
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>Category</th>
               <SortTh field="salesPrice" label="Sales Price" align="right" />
               <SortTh field="costPrice" label="Cost Price" align="right" />
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', textAlign: 'right', whiteSpace: 'nowrap' }}>On Hand</th>
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', textAlign: 'right', whiteSpace: 'nowrap' }}>Reserved</th>
-              <SortTh field="freeToUse" label="Free to Use" align="right" />
+              <SortTh field="available" label="Free to Use" align="right" />
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', textAlign: 'right', whiteSpace: 'nowrap' }}>Reorder Pt.</th>
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>Procurement</th>
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>Status</th>
@@ -154,14 +185,20 @@ export default function ProductListPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredProducts.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={12} style={{ padding: 'var(--space-lg)', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  Loading products...
+                </td>
+              </tr>
+            ) : sortedProducts.length === 0 ? (
               <tr>
                 <td colSpan={12} style={{ padding: 'var(--space-lg)', textAlign: 'center', color: 'var(--text-muted)' }}>
                   No products found matching the criteria.
                 </td>
               </tr>
             ) : (
-              filteredProducts.map((p) => {
+              sortedProducts.map((p) => {
                 const stockStatus = getStockStatus(p);
                 return (
                   <tr
@@ -170,15 +207,15 @@ export default function ProductListPage() {
                     onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg-app)')}
                     onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                   >
-                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontFamily: 'monospace', fontWeight: 500, fontSize: 'var(--text-sm)' }}>{p.code}</td>
+                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontFamily: 'monospace', fontWeight: 500, fontSize: 'var(--text-sm)' }}>{p.reference}</td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 500, fontSize: 'var(--text-sm)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {p.name}
-                        {p.freeToUse < p.reorderPoint && <AlertTriangle size={13} color="var(--status-warning)" />}
+                        {p.available < p.reorderPoint && <AlertTriangle size={13} color="var(--status-warning)" />}
                       </div>
                     </td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: 'var(--text-xs)', fontWeight: 500, backgroundColor: p.category === 'Raw Material' ? 'rgba(3,105,161,0.1)' : p.category === 'Finished Good' ? 'rgba(56,161,105,0.1)' : 'rgba(113,128,150,0.1)', color: p.category === 'Raw Material' ? 'var(--accent-main)' : p.category === 'Finished Good' ? 'var(--status-success)' : 'var(--text-muted)' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: '9999px', fontSize: 'var(--text-xs)', fontWeight: 500, backgroundColor: p.category === 'RAW_MATERIAL' ? 'rgba(3,105,161,0.1)' : p.category === 'FINISHED_GOOD' ? 'rgba(56,161,105,0.1)' : 'rgba(113,128,150,0.1)', color: p.category === 'RAW_MATERIAL' ? 'var(--accent-main)' : p.category === 'FINISHED_GOOD' ? 'var(--status-success)' : 'var(--text-muted)' }}>
                         {p.category}
                       </span>
                     </td>
@@ -186,7 +223,7 @@ export default function ProductListPage() {
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'right', fontFamily: 'monospace', fontSize: 'var(--text-sm)' }}>₹{p.costPrice.toLocaleString('en-IN')}</td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'right', fontFamily: 'monospace', fontSize: 'var(--text-sm)' }}>{p.onHand}</td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'right', fontFamily: 'monospace', fontSize: 'var(--text-sm)', color: p.reserved > 0 ? 'var(--status-warning)' : 'inherit' }}>{p.reserved}</td>
-                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'right', fontFamily: 'monospace', fontSize: 'var(--text-sm)', fontWeight: 600, color: p.freeToUse < p.reorderPoint ? 'var(--status-danger)' : 'var(--status-success)' }}>{p.freeToUse}</td>
+                    <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'right', fontFamily: 'monospace', fontSize: 'var(--text-sm)', fontWeight: 600, color: p.available < p.reorderPoint ? 'var(--status-danger)' : 'var(--status-success)' }}>{p.available}</td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)', textAlign: 'right', fontFamily: 'monospace', fontSize: 'var(--text-sm)' }}>{p.reorderPoint}</td>
                     <td style={{ padding: 'var(--space-xs) var(--space-sm)' }}>
                       <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: 'var(--text-xs)', fontWeight: 600, backgroundColor: p.procureOnDemand ? 'var(--sidebar-bg)' : 'var(--bg-app)', color: p.procureOnDemand ? 'var(--sidebar-text)' : 'var(--text-muted)', border: p.procureOnDemand ? '1px solid var(--sidebar-bg)' : '1px solid var(--border-main)' }}>

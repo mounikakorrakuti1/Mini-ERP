@@ -7,7 +7,7 @@ import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 
 interface FormState {
   name: string;
-  code: string;
+  reference: string;
   description: string;
   category: 'Raw Material' | 'Finished Good' | 'Service';
   costPrice: string;
@@ -21,7 +21,7 @@ interface FormState {
 }
 
 const initial: FormState = {
-  name: '', code: '', description: '', category: 'Raw Material',
+  name: '', reference: '', description: '', category: 'Raw Material',
   costPrice: '', salesPrice: '', reorderPoint: '', safetyStock: '',
   procureOnDemand: false, procurementType: 'PURCHASE',
   defaultVendorId: '', defaultBomId: '',
@@ -44,7 +44,7 @@ export default function ProductFormPage() {
         const p = res.data.data;
         setForm({
           name: p.name || '',
-          code: p.code || '',
+          reference: p.reference || '',
           description: p.description || '',
           category: p.category || 'Raw Material',
           costPrice: String(p.costPrice ?? ''),
@@ -65,12 +65,12 @@ export default function ProductFormPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!form.name || !form.code) { setError('Product Name and SKU are required.'); return; }
+    if (!form.name || !form.reference) { setError('Product Name and SKU are required.'); return; }
     setIsSaving(true);
     try {
       const payload = {
         name: form.name,
-        code: form.code,
+        reference: form.reference,
         description: form.description,
         category: form.category,
         costPrice: parseFloat(form.costPrice) || 0,
@@ -159,7 +159,7 @@ export default function ProductFormPage() {
             <input className="input-field" style={inputStyle} value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Oak Dining Chair" />
           </Field>
           <Field label="SKU Code" required>
-            <input className="input-field" style={inputStyle} value={form.code} onChange={e => set('code', e.target.value)} placeholder="e.g. SKU-001" />
+            <input className="input-field" style={inputStyle} value={form.reference} onChange={e => set('reference', e.target.value)} placeholder="e.g. SKU-001" />
           </Field>
           <Field label="Description">
             <textarea className="input-field" style={{ ...inputStyle, resize: 'vertical', minHeight: '80px' }} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Product description..." />

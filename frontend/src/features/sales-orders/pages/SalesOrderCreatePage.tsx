@@ -41,8 +41,13 @@ export default function SalesOrderCreatePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerId || items.some(i => !i.productId || i.orderedQty <= 0)) {
-      alert('Please fill in all required fields properly.');
+    if (!customerId || items.length === 0 || items.some(i => !i.productId || i.orderedQty <= 0)) {
+      alert('Please fill in all required fields properly, and ensure there is at least one item.');
+      return;
+    }
+    const productIds = items.map(i => i.productId);
+    if (new Set(productIds).size !== productIds.length) {
+      alert('Duplicate products are not allowed in the same order. Please combine quantities for the same product.');
       return;
     }
     setIsSubmitting(true);
@@ -123,13 +128,13 @@ export default function SalesOrderCreatePage() {
                       <td className="table__td">
                         <select className="input-field" style={{ width: '100%' }} value={item.productId} onChange={(e) => handleProductChange(index, e.target.value)} required>
                           <option value="">Select Product...</option>
-                          {products?.filter(p => p.category === 'Finished Good' || p.category === 'Service').map(p => (
-                            <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                          {products?.filter(p => p.category === 'FINISHED_GOOD' || p.category === 'SERVICE').map(p => (
+                            <option key={p.id} value={p.id}>{p.name} ({p.reference})</option>
                           ))}
                         </select>
                       </td>
                       <td className="table__td"><input type="number" min="1" value={item.orderedQty} onChange={(e) => handleItemChange(index, 'orderedQty', e.target.value)} className="input-field" style={{ width: '100px' }} required /></td>
-                      <td className="table__td"><input type="number" step="0.01" value={item.salesPrice} onChange={(e) => handleItemChange(index, 'salesPrice', e.target.value)} className="input-field" style={{ width: '140px' }} required /></td>
+                      <td className="table__td"><input type="number" min="0" step="0.01" value={item.salesPrice} onChange={(e) => handleItemChange(index, 'salesPrice', e.target.value)} className="input-field" style={{ width: '140px' }} required /></td>
                       <td className="table__td" style={{ verticalAlign: 'middle' }}>${(item.orderedQty * item.salesPrice).toLocaleString()}</td>
                       <td className="table__td" style={{ textAlign: 'right' }}>
                         <button type="button" className="btn btn--icon" style={{ color: 'var(--status-danger)' }} onClick={() => removeItem(index)}>

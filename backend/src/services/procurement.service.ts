@@ -199,7 +199,35 @@ export class ProcurementService {
     });
 
     const demandMap = await this.calculateAllDailyDemands(30, db);
-    const updateFns: (() => Promise<any>)[] = [];
+    const existingAlerts = await db.procurementAlert.findMany({ where: { resolved: false } });
+    
+    const existingMap = new Map<string, any>();
+    for (const a of existingAlerts) {
+      existingMap.set(`${a.productId}_${a.type}`, a);
+    }
+
+    const createData: any[] = [];
+    const updateData: any[] = [];
+    const resolveIds: string[] = [];
+    const updateProductFns: (() => Promise<any>)[] = [];
+
+    const handleAlert = (productId: string, type: ProcurementAlertType, message: string, shouldAlert: boolean) => {
+       const key = `${productId}_${type}`;
+       const existing = existingMap.get(key);
+       if (shouldAlert) {
+          if (existing) {
+             if (existing.message !== message) {
+                 updateData.push({ id: existing.id, message });
+             }
+          } else {
+             createData.push({ productId, type, message });
+          }
+       } else {
+          if (existing) {
+             resolveIds.push(existing.id);
+          }
+       }
+    };
 
     for (const product of products) {
       const dailyDemand = demandMap[product.id] || 0.1;
@@ -211,50 +239,50 @@ export class ProcurementService {
       let reorderPoint = Number(product.reorderPoint);
 
       if (reorderPoint !== optimalROP) {
-        updateFns.push(() => db.product.update({ where: { id: product.id }, data: { reorderPoint: optimalROP } }));
+        updateProductFns.push(() => db.product.update({ where: { id: product.id }, data: { reorderPoint: optimalROP } }));
         reorderPoint = optimalROP;
       }
 
       const predictedDaysUntilStockout = currentStock / dailyDemand;
 
-      if (currentStock <= reorderPoint) {
-        updateFns.push(() => this.createOrUpdateAlert(product.id, 'LOW_STOCK', `Current stock (${currentStock}) is below the dynamically set reorder point (${reorderPoint}).`, db));
-      } else {
-        updateFns.push(() => this.resolveAlert(product.id, 'LOW_STOCK', db));
-      }
+      handleAlert(
+         product.id, 
+         'LOW_STOCK', 
+         `Current stock (${currentStock}) is below the dynamically set reorder point (${reorderPoint}).`,
+         currentStock <= reorderPoint
+      );
 
-      if (predictedDaysUntilStockout < leadTime && currentStock > 0) {
-        updateFns.push(() => this.createOrUpdateAlert(product.id, 'PREDICTED_STOCKOUT', `Stockout predicted in ${Math.round(predictedDaysUntilStockout)} days, which is less than lead time (${leadTime} days).`, db));
-      } else {
-        updateFns.push(() => this.resolveAlert(product.id, 'PREDICTED_STOCKOUT', db));
-      }
+      handleAlert(
+         product.id, 
+         'PREDICTED_STOCKOUT', 
+         `Stockout predicted in ${Math.round(predictedDaysUntilStockout)} days, which is less than lead time (${leadTime} days).`,
+         predictedDaysUntilStockout < leadTime && currentStock > 0
+      );
 
-      if (dailyDemand > reorderPoint * 2 && reorderPoint > 0) {
-        updateFns.push(() => this.createOrUpdateAlert(product.id, 'HIGH_DEMAND', `Unusually high demand detected: ${dailyDemand.toFixed(2)} units/day.`, db));
-      } else {
-         updateFns.push(() => this.resolveAlert(product.id, 'HIGH_DEMAND', db));
-      }
+      handleAlert(
+         product.id, 
+         'HIGH_DEMAND', 
+         `Unusually high demand detected: ${dailyDemand.toFixed(2)} units/day.`,
+         dailyDemand > reorderPoint * 2 && reorderPoint > 0
+      );
     }
     
-    if (updateFns.length > 0) {
-      // Chunk updates to prevent neon connection limits
-      for (let i = 0; i < updateFns.length; i += 15) {
-        await Promise.all(updateFns.slice(i, i + 15).map(fn => fn()));
+    if (resolveIds.length > 0) {
+      await db.procurementAlert.updateMany({ where: { id: { in: resolveIds } }, data: { resolved: true, resolvedAt: new Date() } });
+    }
+    if (createData.length > 0) {
+      await db.procurementAlert.createMany({ data: createData });
+    }
+    if (updateData.length > 0) {
+      for (let i = 0; i < updateData.length; i += 15) {
+        await Promise.all(updateData.slice(i, i + 15).map(data => db.procurementAlert.update({ where: { id: data.id }, data: { message: data.message } })));
       }
     }
-  }
-
-  private async createOrUpdateAlert(productId: string, type: ProcurementAlertType, message: string, db: Db) {
-    const existing = await db.procurementAlert.findFirst({ where: { productId, type, resolved: false } });
-    if (!existing) {
-      await db.procurementAlert.create({ data: { productId, type, message } });
-    } else if (existing.message !== message) {
-      await db.procurementAlert.update({ where: { id: existing.id }, data: { message } });
+    if (updateProductFns.length > 0) {
+      for (let i = 0; i < updateProductFns.length; i += 15) {
+        await Promise.all(updateProductFns.slice(i, i + 15).map(fn => fn()));
+      }
     }
-  }
-
-  private async resolveAlert(productId: string, type: ProcurementAlertType, db: Db) {
-    await db.procurementAlert.updateMany({ where: { productId, type, resolved: false }, data: { resolved: true, resolvedAt: new Date() } });
   }
 
   async generateRecommendations(db: Db = prisma) {

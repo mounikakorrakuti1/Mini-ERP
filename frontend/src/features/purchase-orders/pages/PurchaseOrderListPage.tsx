@@ -9,6 +9,8 @@ export default function PurchaseOrderListPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -27,7 +29,8 @@ export default function PurchaseOrderListPage() {
     switch (status) {
       case 'DRAFT': return 'status-badge--draft';
       case 'CONFIRMED': return 'status-badge--confirmed';
-      case 'RECEIVED': return 'status-badge--success';
+      case 'PARTIALLY_RECEIVED': return 'status-badge--warning';
+      case 'FULLY_RECEIVED': return 'status-badge--success';
       case 'CANCELLED': return 'status-badge--danger';
       default: return 'status-badge--draft';
     }
@@ -38,7 +41,9 @@ export default function PurchaseOrderListPage() {
     const ref = (o.reference || o.id).toLowerCase();
     const vendor = (o.vendor?.name || '').toLowerCase();
     const status = (o.status || '').toLowerCase();
-    return ref.includes(q) || vendor.includes(q) || status.includes(q);
+    const matchesSearch = ref.includes(q) || vendor.includes(q) || status.includes(q);
+    const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
   return (
@@ -58,7 +63,14 @@ export default function PurchaseOrderListPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <button className="btn btn--outline"><Filter size={16} /> Filter</button>
+          <select className="input-field" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ appearance: 'auto', padding: '0.4rem var(--space-sm)', minWidth: '130px' }}>
+            <option value="ALL">All Status</option>
+            <option value="DRAFT">Draft</option>
+            <option value="CONFIRMED">Confirmed</option>
+            <option value="PARTIALLY_RECEIVED">Partially Received</option>
+            <option value="FULLY_RECEIVED">Fully Received</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
           <Link to={`${ROUTES.PURCHASE_ORDERS}/new`} className="btn btn--primary">
             <Plus size={16} /> New PO
           </Link>

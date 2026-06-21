@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 
 export interface Product {
   id: string;
-  code: string;
+  reference: string;
   name: string;
   category: 'Raw Material' | 'Finished Good' | 'Service';
   salesPrice: number;

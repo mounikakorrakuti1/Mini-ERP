@@ -52,6 +52,7 @@ const items = z
 const dateField = z.coerce.date().optional();
 const productInput = z.object({
   name: z.string().trim().min(1),
+  reference: z.string().trim().min(1).optional(),
   category: z.nativeEnum(ProductCategory).default(ProductCategory.RAW_MATERIAL),
   salesPrice: z.coerce.number().nonnegative(),
   costPrice: z.coerce.number().nonnegative(),
@@ -330,8 +331,95 @@ app.get(
   '/products',
   authenticate,
   requirePermission('PRODUCTS', 'VIEW'),
-  asyncHandler(async (_q, r) => ok(r, await prisma.product.findMany({ where: { active: true } }))),
+  asyncHandler(async (q, r) => {
+    const { page = '1', limit = '100', search, category, status, procurementFilter } = q.query;
+    const pageNum = parseInt(page as string, 10) || 1;
+    const limitNum = parseInt(limit as string, 10) || 100;
+    const skip = (pageNum - 1) * limitNum;
+    
+    const where: any = { active: true };
+    if (search) {
+      where.OR = [
+        { name: { contains: String(search), mode: 'insensitive' } },
+        { reference: { contains: String(search), mode: 'insensitive' } }
+      ];
+    }
+    if (category && category !== 'ALL') {
+      where.category = String(category);
+    }
+    if (procurementFilter && procurementFilter !== 'ALL') {
+      if (procurementFilter === 'PURCHASE') {
+        where.procurementType = 'PURCHASE';
+        where.procureOnDemand = true;
+      } else if (procurementFilter === 'MANUFACTURING') {
+        where.procurementType = 'MANUFACTURING';
+        where.procureOnDemand = true;
+      } else if (procurementFilter === 'STOCKED') {
+        where.procureOnDemand = false;
+      }
+    }
+
+    if (status && status !== 'ALL') {
+      const productsWithQuantities = await prisma.product.findMany({
+        where,
+        select: { id: true, onHandQty: true, reorderPoint: true }
+      });
+      const activeReservations = await prisma.inventoryReservation.groupBy({
+        by: ['productId'],
+        where: { active: true, productId: { in: productsWithQuantities.map(p => p.id) } },
+        _sum: { quantity: true }
+      });
+      const reservedMap = new Map(activeReservations.map(res => [res.productId, Number(res._sum.quantity || 0)]));
+      
+      const validIds = productsWithQuantities.filter(p => {
+        const reserved = reservedMap.get(p.id) || 0;
+        const available = Number(p.onHandQty) - reserved;
+        const isLow = available < Number(p.reorderPoint);
+        if (status === 'LOW') return isLow && available > 0;
+        if (status === 'OUT') return available <= 0;
+        if (status === 'OK') return !isLow && available > 0;
+        return true;
+      }).map(p => p.id);
+
+      where.id = { in: validIds };
+    }
+
+    const [total, products] = await Promise.all([
+      prisma.product.count({ where }),
+      prisma.product.findMany({ where, skip, take: limitNum, orderBy: { name: 'asc' } })
+    ]);
+
+    const activeReservationsFinal = await prisma.inventoryReservation.groupBy({
+      by: ['productId'],
+      where: { active: true, productId: { in: products.map(p => p.id) } },
+      _sum: { quantity: true }
+    });
+    const reservedMapFinal = new Map(activeReservationsFinal.map(res => [res.productId, Number(res._sum.quantity || 0)]));
+    
+    const data = products.map((p) => {
+      const reserved = reservedMapFinal.get(p.id) || 0;
+      return {
+        ...p,
+        onHand: Number(p.onHandQty),
+        reserved,
+        available: Number(p.onHandQty) - reserved,
+      };
+    });
+
+    ok(r, data, 200, { total, page: pageNum, limit: limitNum });
+  }),
 );
+
+app.get(
+  '/products/:id',
+  authenticate,
+  requirePermission('PRODUCTS', 'VIEW'),
+  asyncHandler(async (q, r) => {
+    const product = await prisma.product.findUniqueOrThrow({ where: { id: q.params.id } });
+    ok(r, product);
+  }),
+);
+
 app.post(
   '/products',
   authenticate,
@@ -340,27 +428,34 @@ app.post(
   asyncHandler(async (q, r) => {
     const d = q.body;
     validateProcurementConfiguration(d);
-    ok(
-      r,
-      await prisma.$transaction(async (tx) => {
-        const created = await tx.product.create({
-          data: { ...d, reference: `PROD-${Date.now()}` },
-        });
-        await tx.auditLog.create({
-          data: {
-            actorId: q.user!.sub,
-            module: 'PRODUCT',
-            recordType: 'Product',
-            recordId: created.id,
-            action: 'CREATE',
-            fieldName: 'reference',
-            newValue: created.reference,
-          },
-        });
-        return created;
-      }),
-      201,
-    );
+    try {
+      ok(
+        r,
+        await prisma.$transaction(async (tx) => {
+          const created = await tx.product.create({
+            data: { ...d, reference: d.reference || `PROD-${Date.now()}` },
+          });
+          await tx.auditLog.create({
+            data: {
+              actorId: q.user!.sub,
+              module: 'PRODUCT',
+              recordType: 'Product',
+              recordId: created.id,
+              action: 'CREATE',
+              fieldName: 'reference',
+              newValue: created.reference,
+            },
+          });
+          return created;
+        }),
+        201,
+      );
+    } catch (err: any) {
+      if (err.code === 'P2002') {
+        throw new AppError(409, 'A product with this name or SKU already exists.');
+      }
+      throw err;
+    }
   }),
 );
 app.patch(
@@ -369,32 +464,53 @@ app.patch(
   requirePermission('PRODUCTS', 'ADMIN'),
   body(productInput.partial()),
   asyncHandler(async (q, r) => {
-    ok(r, await prisma.$transaction(async (tx) => {
-        const before = await tx.product.findUniqueOrThrow({ where: { id: q.params.id } });
-        const next = { ...before, ...q.body };
-        validateProcurementConfiguration(next);
-        if (next.defaultBomId) {
-          const bom = await tx.bom.findUnique({ where: { id: next.defaultBomId } });
-          if (!bom || !bom.active || bom.finishedProductId !== before.id)
-            throw new AppError(422, 'Default BoM must be active and belong to this product');
-        }
-        const updated = await tx.product.update({ where: { id: q.params.id }, data: q.body });
-        for (const [field, value] of Object.entries(q.body)) {
-          await tx.auditLog.create({
-            data: {
-              actorId: q.user!.sub,
-              module: 'PRODUCT',
-              recordType: 'Product',
-              recordId: q.params.id,
-              action: 'UPDATE',
-              fieldName: field,
-              oldValue: String((before as any)[field]),
-              newValue: String(value),
-            },
-          });
-        }
-        return updated;
-      }));
+    try {
+      ok(r, await prisma.$transaction(async (tx) => {
+          const before = await tx.product.findUniqueOrThrow({ where: { id: q.params.id } });
+          const next = { ...before, ...q.body };
+          
+          if (!next.procureOnDemand) {
+            next.defaultVendorId = null;
+            next.defaultBomId = null;
+            next.procurementType = null;
+            q.body.defaultVendorId = null;
+            q.body.defaultBomId = null;
+            q.body.procurementType = null;
+          }
+
+          validateProcurementConfiguration(next);
+          if (next.defaultBomId) {
+            const bom = await tx.bom.findUnique({ where: { id: next.defaultBomId } });
+            if (!bom || !bom.active || bom.finishedProductId !== before.id)
+              throw new AppError(422, 'Default BoM must be active and belong to this product');
+          }
+          const updated = await tx.product.update({ where: { id: q.params.id }, data: q.body });
+          
+          for (const [field, value] of Object.entries(q.body)) {
+            const oldVal = (before as any)[field];
+            if (value !== undefined && String(oldVal) !== String(value)) {
+              await tx.auditLog.create({
+                data: {
+                  actorId: q.user!.sub,
+                  module: 'PRODUCT',
+                  recordType: 'Product',
+                  recordId: q.params.id,
+                  action: 'UPDATE',
+                  fieldName: field,
+                  oldValue: String(oldVal),
+                  newValue: String(value),
+                },
+              });
+            }
+          }
+          return updated;
+        }));
+    } catch (err: any) {
+      if (err.code === 'P2002') {
+        throw new AppError(409, 'A product with this name or SKU already exists.');
+      }
+      throw err;
+    }
   }),
 );
 app.post(

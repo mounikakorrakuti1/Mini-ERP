@@ -111,7 +111,7 @@ export default function ProductDetailPage() {
                   </span>
                 </div>
                 <div className="text-sm" style={{ color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '2px' }}>
-                  SKU Code: {product.code}
+                  SKU Code: {product.reference}
                 </div>
               </div>
 

@@ -163,7 +163,7 @@ export default function PurchaseOrderDetailPage() {
             <tbody>
               {order.items.map((item: any) => (
                 <tr className="table__tr" key={item.id}>
-                  <td className="table__td">{item.product?.code || 'Unknown'}</td>
+                  <td className="table__td">{item.product?.reference || 'Unknown'}</td>
                   <td className="table__td">{item.product?.name || 'Unknown'}</td>
                   <td className="table__td">{item.orderedQty}</td>
                   <td className="table__td">{item.receivedQty}</td>
