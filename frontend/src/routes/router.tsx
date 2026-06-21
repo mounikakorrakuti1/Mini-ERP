@@ -9,6 +9,9 @@ import { ProtectedRoute } from './ProtectedRoute';
 import { PermissionRoute } from './PermissionRoute';
 import { NotFoundPage } from './NotFoundPage';
 
+// Landing
+import LandingPage from '@/features/landing/LandingPage';
+
 // Auth Pages
 import LoginPage from '@/features/auth/pages/LoginPage';
 import SignupPage from '@/features/auth/pages/SignupPage';
@@ -63,6 +66,10 @@ import UserDetailPage from '@/features/rbac/pages/UserDetailPage';
 import ProfilePage from '@/features/rbac/pages/ProfilePage';
 
 export const router = createBrowserRouter([
+  // Public landing page
+  { path: '/', element: <LandingPage /> },
+
+  // Auth routes
   {
     path: '/auth',
     element: <AuthLayout />,
@@ -72,8 +79,10 @@ export const router = createBrowserRouter([
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
     ],
   },
+
+  // Protected app routes
   {
-    path: '/',
+    path: '/app',
     element: (
       <ProtectedRoute>
         <RootLayout />
@@ -81,7 +90,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <DashboardPage /> },
-      
+
       // Products
       {
         path: 'products',
@@ -199,7 +208,7 @@ export const router = createBrowserRouter([
       { path: 'procurement', element: <ProcurementRecommendationPage /> },
       { path: 'procurement/traceability/:soId', element: <TraceabilityPage /> },
 
-      // System Checks
+      // System
       {
         path: 'audit-logs',
         element: (
@@ -215,7 +224,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <UserManagementPage /> },
           { path: ':id', element: <UserDetailPage /> },
-        ]
+        ],
       },
       { path: 'profile', element: <ProfilePage /> },
     ],

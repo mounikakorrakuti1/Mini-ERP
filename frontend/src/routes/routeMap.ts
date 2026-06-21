@@ -1,55 +1,58 @@
 export const ROUTES = {
+  // Landing
+  LANDING: '/',
+
   // Auth
   LOGIN: '/auth/login',
   SIGNUP: '/auth/signup',
   FORGOT_PASSWORD: '/auth/forgot-password',
 
-  // Main
-  DASHBOARD: '/',
+  // Main app (all under /app)
+  DASHBOARD: '/app',
 
   // Products
-  PRODUCTS: '/products',
-  PRODUCT_DETAIL: '/products/:id',
-  PRODUCT_CREATE: '/products/new',
-  PRODUCT_EDIT: '/products/:id/edit',
+  PRODUCTS: '/app/products',
+  PRODUCT_DETAIL: '/app/products/:id',
+  PRODUCT_CREATE: '/app/products/new',
+  PRODUCT_EDIT: '/app/products/:id/edit',
 
   // Inventory
-  INVENTORY_LEDGER: '/inventory/ledger',
-  INVENTORY_SUMMARY: '/inventory/summary',
+  INVENTORY_LEDGER: '/app/inventory/ledger',
+  INVENTORY_SUMMARY: '/app/inventory/summary',
 
   // Sales Orders
-  SALES_ORDERS: '/sales-orders',
-  SALES_ORDER_DETAIL: '/sales-orders/:id',
-  SALES_ORDER_CREATE: '/sales-orders/new',
+  SALES_ORDERS: '/app/sales-orders',
+  SALES_ORDER_DETAIL: '/app/sales-orders/:id',
+  SALES_ORDER_CREATE: '/app/sales-orders/new',
 
   // Purchase Orders
-  PURCHASE_ORDERS: '/purchase-orders',
-  PURCHASE_ORDER_DETAIL: '/purchase-orders/:id',
-  PURCHASE_ORDER_CREATE: '/purchase-orders/new',
+  PURCHASE_ORDERS: '/app/purchase-orders',
+  PURCHASE_ORDER_DETAIL: '/app/purchase-orders/:id',
+  PURCHASE_ORDER_CREATE: '/app/purchase-orders/new',
 
   // Manufacturing Orders
-  MANUFACTURING_ORDERS: '/manufacturing-orders',
-  MANUFACTURING_ORDER_DETAIL: '/manufacturing-orders/:id',
-  MANUFACTURING_ORDER_CREATE: '/manufacturing-orders/new',
-  MANUFACTURING_KANBAN: '/manufacturing-orders/kanban',
+  MANUFACTURING_ORDERS: '/app/manufacturing-orders',
+  MANUFACTURING_ORDER_DETAIL: '/app/manufacturing-orders/:id',
+  MANUFACTURING_ORDER_CREATE: '/app/manufacturing-orders/new',
+  MANUFACTURING_KANBAN: '/app/manufacturing-orders/kanban',
 
   // Bill of Materials
-  BOM_LIST: '/bom',
-  BOM_DETAIL: '/bom/:id',
-  BOM_CREATE: '/bom/new',
+  BOM_LIST: '/app/bom',
+  BOM_DETAIL: '/app/bom/:id',
+  BOM_CREATE: '/app/bom/new',
 
   // Partners
-  VENDORS: '/vendors',
-  CUSTOMERS: '/customers',
+  VENDORS: '/app/vendors',
+  CUSTOMERS: '/app/customers',
 
   // Procurement
-  PROCUREMENT_INBOX: '/procurement',
-  TRACEABILITY: '/procurement/traceability/:soId',
+  PROCUREMENT_INBOX: '/app/procurement',
+  TRACEABILITY: '/app/procurement/traceability/:soId',
 
   // System
-  AUDIT_LOGS: '/audit-logs',
-  ANALYTICS: '/analytics',
-  USER_MANAGEMENT: '/admin/users',
-  USER_DETAIL: '/admin/users/:id',
-  PROFILE: '/profile',
+  AUDIT_LOGS: '/app/audit-logs',
+  ANALYTICS: '/app/analytics',
+  USER_MANAGEMENT: '/app/admin/users',
+  USER_DETAIL: '/app/admin/users/:id',
+  PROFILE: '/app/profile',
 } as const;

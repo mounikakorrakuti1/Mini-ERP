@@ -75,16 +75,19 @@ export class OrdersService {
     return prisma.$transaction(async (tx) => {
       const so = await tx.salesOrder.findUnique({ where: { id }, include: { items: true } });
       if (!so) throw new AppError(404, 'Sales order not found');
+      
+      // Lock immutable/workflow-owned fields for all statuses
+      const immutableFields = ['items', 'quantity', 'status', 'availabilityFlag', 'reference', 'customerId'];
+      const lockedFields = locked(data, immutableFields);
+      if (lockedFields.length > 0) {
+        throw new AppError(403, `Fields are immutable and cannot be modified: ${lockedFields.join(', ')}`);
+      }
+      
       if (so.status !== SalesStatus.DRAFT)
-        throw new AppError(409, 'Sales order is locked after confirmation');
-      const updateData: any = { ...data };
-      delete updateData.items;
-      delete updateData.quantity;
-      delete updateData.status;
-      delete updateData.availabilityFlag;
-      delete updateData.reference;
-      const updated = await tx.salesOrder.update({ where: { id }, data: updateData });
-      for (const [field, value] of Object.entries(updateData))
+        throw new AppError(409, 'Sales order can only be edited in DRAFT status');
+      
+      const updated = await tx.salesOrder.update({ where: { id }, data });
+      for (const [field, value] of Object.entries(data))
         await audit(
           tx,
           actor,
@@ -432,17 +435,19 @@ export class OrdersService {
     return prisma.$transaction(async (tx) => {
       const po = await tx.purchaseOrder.findUnique({ where: { id } });
       if (!po) throw new AppError(404, 'Purchase order not found');
+      
+      // Lock immutable/workflow-owned fields for all statuses
+      const immutableFields = ['items', 'quantity', 'status', 'autoCreated', 'triggerSourceSoId', 'reference', 'vendorId'];
+      const lockedFields = locked(data, immutableFields);
+      if (lockedFields.length > 0) {
+        throw new AppError(403, `Fields are immutable and cannot be modified: ${lockedFields.join(', ')}`);
+      }
+      
       if (po.status !== PurchaseStatus.DRAFT)
-        throw new AppError(409, 'Purchase order is locked after confirmation');
-      const updateData: any = { ...data };
-      delete updateData.items;
-      delete updateData.quantity;
-      delete updateData.status;
-      delete updateData.autoCreated;
-      delete updateData.triggerSourceSoId;
-      delete updateData.reference;
-      const updated = await tx.purchaseOrder.update({ where: { id }, data: updateData });
-      for (const [field, value] of Object.entries(updateData))
+        throw new AppError(409, 'Purchase order can only be edited in DRAFT status');
+      
+      const updated = await tx.purchaseOrder.update({ where: { id }, data });
+      for (const [field, value] of Object.entries(data))
         await audit(
           tx,
           actor,
@@ -643,17 +648,20 @@ export class OrdersService {
     return prisma.$transaction(async (tx) => {
       const mo = await tx.manufacturingOrder.findUnique({ where: { id } });
       if (!mo) throw new AppError(404, 'Manufacturing order not found');
-      if (mo.status !== ManufacturingStatus.DRAFT)
-        throw new AppError(409, 'Manufacturing order is locked after confirmation');
-      const updateData: any = { ...data };
-      delete updateData.items;
-      delete updateData.components;
-      delete updateData.status;
-      delete updateData.autoCreated;
-      delete updateData.triggerSourceSoId;
-      delete updateData.reference;
-      const updated = await tx.manufacturingOrder.update({ where: { id }, data: updateData });
-      for (const [field, value] of Object.entries(updateData))
+      
+      // Lock immutable/workflow-owned fields for all statuses
+      const immutableFields = ['items', 'components', 'status', 'autoCreated', 'triggerSourceSoId', 'reference', 'quantity', 'finishedProductId', 'bomId'];
+      const lockedFields = locked(data, immutableFields);
+      if (lockedFields.length > 0) {
+        throw new AppError(403, `Fields are immutable and cannot be modified: ${lockedFields.join(', ')}`);
+      }
+      
+      if (mo.status !== ManufacturingStatus.DRAFT) {
+        throw new AppError(409, 'Manufacturing order can only be edited in DRAFT status');
+      }
+
+      const updated = await tx.manufacturingOrder.update({ where: { id }, data });
+      for (const [field, value] of Object.entries(data))
         await audit(
           tx,
           actor,
