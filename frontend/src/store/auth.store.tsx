@@ -13,6 +13,7 @@ export interface User {
   role: Role;
   loginId: string;
   position: string;
+  avatar?: string | null;
   permissions: DynamicPermission[];
 }
 
@@ -23,6 +24,7 @@ interface AuthState {
   login: (credentials: any) => Promise<void>;
   register: (data: any) => Promise<void>;
   logout: () => void;
+  updateUser: (data: Partial<User>) => void;
 }
 
 // ─── Context ────────────────────────────────────────────────────
@@ -79,6 +81,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
   };
 
+  const updateUser = (data: Partial<User>) => {
+    if (user) {
+      setUser({ ...user, ...data });
+    }
+  };
+
 
   return (
     <AuthContext.Provider
@@ -89,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        updateUser,
       }}
     >
       {children}

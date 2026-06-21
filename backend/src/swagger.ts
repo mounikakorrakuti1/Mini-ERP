@@ -1,7 +1,7 @@
 export const openApiSpec = {
   openapi: '3.0.3',
   info: {
-    title: 'Mini ERP Demand to Delivery API',
+    title: 'Furnexa Demand to Delivery API',
     version: '1.0.0',
     description:
       'Hackathon-ready backend API for auth, masters, orders, inventory, dashboard, traceability, audit logs, and notifications.',

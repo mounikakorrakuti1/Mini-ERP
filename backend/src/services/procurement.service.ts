@@ -2,9 +2,7 @@ import { PrismaClient, Prisma, ProcurementAlertType, ProcurementType } from '@pr
 import { AppError } from '../lib/errors.js';
 import { prisma } from '../lib/prisma.js';
 import { inventoryService } from './inventory.service.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as brain from 'brain.js';
+
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -108,52 +106,6 @@ export class ProcurementService {
 
   async calculateAllDailyDemands(days = 30, db: Db = prisma): Promise<Record<string, number>> {
     const demandMap: Record<string, number> = {};
-    const modelPath = path.resolve(process.cwd(), 'demand-model.json');
-    let mlModel: any = null;
-    let maxDemand = 1;
-
-    try {
-      if (fs.existsSync(modelPath)) {
-        const fileData = fs.readFileSync(modelPath, 'utf8');
-        const parsed = JSON.parse(fileData);
-        maxDemand = parsed.metadata?.maxDemand || 1;
-        const net = new brain.NeuralNetwork();
-        net.fromJSON(parsed.network);
-        mlModel = net;
-      }
-    } catch (e) {
-      console.error('Failed to load ML model, falling back to heuristic', e);
-    }
-
-    if (mlModel) {
-      const windowDate = new Date();
-      windowDate.setDate(windowDate.getDate() - 5);
-      const rawMovements = await db.stockMovement.findMany({
-         where: { direction: 'OUT', createdAt: { gte: windowDate } },
-         select: { productId: true, quantity: true, createdAt: true }
-      });
-
-      const prodMap: Record<string, Record<string, number>> = {};
-      for (const m of rawMovements) {
-         const dStr = m.createdAt.toISOString().split('T')[0];
-         if (!prodMap[m.productId]) prodMap[m.productId] = {};
-         if (!prodMap[m.productId][dStr]) prodMap[m.productId][dStr] = 0;
-         prodMap[m.productId][dStr] += Number(m.quantity);
-      }
-
-      const dateStrs = [];
-      for(let i=5; i>=1; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        dateStrs.push(d.toISOString().split('T')[0]);
-      }
-
-      for (const pid in prodMap) {
-         const inputSeq = dateStrs.map(ds => (prodMap[pid][ds] || 0) / maxDemand);
-         const output = mlModel.run(inputSeq) as number[];
-         demandMap[pid] = (output[0] || 0.01) * maxDemand;
-      }
-    }
 
     const pastDate = new Date();
     pastDate.setDate(pastDate.getDate() - days);

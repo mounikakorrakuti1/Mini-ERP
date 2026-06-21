@@ -56,7 +56,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <span className="icon">
               <Factory size={28} />
             </span>
-            <span className="title" style={{ fontWeight: 800, fontSize: '1.7rem', transform: 'translateY(4px)' }}>Mini ERP</span>
+            <span className="title" style={{ fontWeight: 800, fontSize: '1.7rem', transform: 'translateY(4px)' }}>Furnexa</span>
           </a>
         </li>
 

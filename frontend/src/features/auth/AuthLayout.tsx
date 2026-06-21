@@ -9,7 +9,7 @@ export default function AuthLayout() {
           <div className="auth-brand__logo">
             <Factory size={32} />
           </div>
-          <div className="h2" style={{ color: 'var(--text-main)' }}>Mini ERP</div>
+          <div className="h2" style={{ color: 'var(--text-main)' }}>Furnexa</div>
           {/* <div className="text-sm">---------------------------------</div> */}
         </div>
 

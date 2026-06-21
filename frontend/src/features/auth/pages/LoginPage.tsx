@@ -29,7 +29,7 @@ export default function LoginPage() {
     <form onSubmit={handleLogin} className="auth-form">
       <div className="auth-form__header">
         <div className="h3">Welcome Back</div>
-        <div className="text-xs">Sign in to continue to Mini ERP</div>
+        <div className="text-xs">Sign in to continue to Furnexa</div>
       </div>
 
       {error && <div style={{ color: 'var(--status-danger)', fontSize: 'var(--text-xs)', marginBottom: 'var(--space-sm)' }}>{error}</div>}

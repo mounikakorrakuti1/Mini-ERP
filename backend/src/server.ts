@@ -25,7 +25,7 @@ const httpServer = createServer(app);
 realtimeService.init(httpServer);
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(morgan('tiny'));
 app.use(rateLimit({ windowMs: 60_000, max: 120 }));
 const ok = (res: express.Response, data: any, status = 200, meta: any = {}) =>
@@ -1200,6 +1200,24 @@ app.get(
 );
 
 app.patch(
+  '/profile',
+  authenticate,
+  body(z.object({
+    name: z.string().min(1).optional(),
+    address: z.string().optional().nullable(),
+    mobile: z.string().optional().nullable(),
+    avatar: z.string().optional().nullable(),
+  })),
+  asyncHandler(async (q, r) => {
+    const user = await prisma.user.update({
+      where: { id: q.user!.sub },
+      data: q.body,
+    });
+    ok(r, user);
+  })
+);
+
+app.patch(
   '/procurement/recommendations/:id/approve',
   authenticate,
   requirePermission('PROCUREMENT', 'ADMIN'),
@@ -1221,5 +1239,5 @@ app.use(errorHandler);
 
 export { app, httpServer };
 if (process.env.NODE_ENV !== 'test') {
-  httpServer.listen(Number(process.env.PORT || 3000), () => console.log('Mini ERP API listening'));
+  httpServer.listen(Number(process.env.PORT || 3000), () => console.log('Furnexa API listening'));
 }
