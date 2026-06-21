@@ -63,6 +63,7 @@ async function main() {
   const finished = await request<any>('POST', '/products', {
     reference: `DEMO-FG-${suffix}`,
     name: `Demo Finished Good ${suffix}`,
+    category: 'FINISHED_GOOD',
     salesPrice: 500,
     costPrice: 250,
     reorderPoint: 2,

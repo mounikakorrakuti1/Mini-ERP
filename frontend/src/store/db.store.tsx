@@ -8,7 +8,7 @@ export interface Product {
   id: string;
   reference: string;
   name: string;
-  category: 'Raw Material' | 'Finished Good' | 'Service';
+  category: 'RAW_MATERIAL' | 'FINISHED_GOOD' | 'SERVICE';
   salesPrice: number;
   costPrice: number;
   reorderPoint: number;

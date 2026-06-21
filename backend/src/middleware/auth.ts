@@ -27,8 +27,12 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       ),
     };
     next();
-  } catch {
-    res.status(401).json({ data: null, meta: null, error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' } });
+  } catch (err: any) {
+    if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+      return res.status(401).json({ data: null, meta: null, error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' } });
+    }
+    console.error('Authentication error:', err);
+    return res.status(500).json({ data: null, meta: null, error: { code: 'INTERNAL_ERROR', message: 'Internal server error during authentication' } });
   }
 }
 export const requirePermission =

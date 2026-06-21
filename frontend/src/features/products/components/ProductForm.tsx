@@ -15,8 +15,8 @@ export function ProductForm({ initialData, onSubmit, onCancel }: ProductFormProp
   // ─── Local State ─────────────────────────────────────────────────
   const [name, setName] = useState(initialData?.name ?? '');
   const [reference, setReference] = useState(initialData?.reference ?? '');
-  const [category, setCategory] = useState<'Raw Material' | 'Finished Good' | 'Service'>(
-    initialData?.category ?? 'Raw Material'
+  const [category, setCategory] = useState<'RAW_MATERIAL' | 'FINISHED_GOOD' | 'SERVICE'>(
+    initialData?.category ?? 'RAW_MATERIAL'
   );
   const [salesPrice, setSalesPrice] = useState(initialData?.salesPrice?.toString() ?? '0');
   const [costPrice, setCostPrice] = useState(initialData?.costPrice?.toString() ?? '0');
@@ -48,7 +48,7 @@ export function ProductForm({ initialData, onSubmit, onCancel }: ProductFormProp
   // Adjust procurement choices based on category dynamically for helpful defaults
   useEffect(() => {
     if (procureOnDemand) {
-      if (category === 'Finished Good') {
+      if (category === 'FINISHED_GOOD') {
         setProcurementType('MANUFACTURING');
       } else {
         setProcurementType('PURCHASE');
@@ -132,9 +132,9 @@ export function ProductForm({ initialData, onSubmit, onCancel }: ProductFormProp
             onChange={(e) => setCategory(e.target.value as any)}
             style={{ appearance: 'auto' }}
           >
-            <option value="Raw Material">Raw Material</option>
-            <option value="Finished Good">Finished Good</option>
-            <option value="Service">Service</option>
+            <option value="RAW_MATERIAL">Raw Material</option>
+            <option value="FINISHED_GOOD">Finished Good</option>
+            <option value="SERVICE">Service</option>
           </select>
         </div>
 

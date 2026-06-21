@@ -12,7 +12,7 @@ export interface ProductFormErrors {
 export interface ProductFormData {
   name: string;
   reference: string;
-  category: 'Raw Material' | 'Finished Good' | 'Service';
+  category: 'RAW_MATERIAL' | 'FINISHED_GOOD' | 'SERVICE';
   salesPrice: number;
   costPrice: number;
   reorderPoint: number;

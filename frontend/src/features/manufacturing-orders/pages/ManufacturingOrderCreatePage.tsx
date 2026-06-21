@@ -68,7 +68,7 @@ export default function ManufacturingOrderCreatePage() {
                 setBomId('');
               }} required>
                 <option value="">Select a Product</option>
-                {products?.filter(p => p.category === 'Finished Good').map(p => (
+                {products?.filter(p => p.category === 'FINISHED_GOOD').map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
@@ -79,7 +79,7 @@ export default function ManufacturingOrderCreatePage() {
               <select className="input-field" value={bomId} onChange={e => setBomId(e.target.value)} required disabled={!finishedProductId}>
                 <option value="">Select BoM</option>
                 {filteredBoms.map(b => (
-                  <option key={b.id} value={b.id}>{(b as any).reference}</option>
+                  <option key={b.id} value={b.id}>{b.name ? `${b.name} (${(b as any).reference})` : (b as any).reference}</option>
                 ))}
               </select>
             </div>

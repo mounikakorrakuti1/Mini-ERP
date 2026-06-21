@@ -9,6 +9,8 @@ export default function ManufacturingOrderListPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -39,7 +41,9 @@ export default function ManufacturingOrderListPage() {
     const ref = (o.reference || o.id).toLowerCase();
     const product = (o.finishedProduct?.name || '').toLowerCase();
     const status = (o.status || '').toLowerCase();
-    return ref.includes(q) || product.includes(q) || status.includes(q);
+    const matchesSearch = ref.includes(q) || product.includes(q) || status.includes(q);
+    const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
   return (
@@ -59,6 +63,14 @@ export default function ManufacturingOrderListPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+          <select className="input-field" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ appearance: 'auto', padding: '0.4rem var(--space-sm)', minWidth: '130px' }}>
+            <option value="ALL">All Status</option>
+            <option value="DRAFT">Draft</option>
+            <option value="CONFIRMED">Confirmed</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
           <Link to={`${ROUTES.MANUFACTURING_ORDERS}/kanban`} className="btn btn--outline">
             Kanban Board
           </Link>
