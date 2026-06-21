@@ -25,7 +25,7 @@ export default function BomDetailPage() {
   }, [id]);
 
   const handleEdit = () => {
-    alert('Opening BoM editor...');
+    navigate(ROUTES.BOM_EDIT.replace(':id', bom.id));
   };
 
   const handleDuplicate = () => {

@@ -170,14 +170,34 @@ export default function ProductListPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1100px' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid var(--border-main)', backgroundColor: 'var(--bg-app)' }}>
-              <SortTh field="reference" label="SKU Code" />
-              <SortTh field="name" label="Product Name" />
+              <th style={{ padding: '0', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
+                <button type="button" onClick={() => handleSort('reference')} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '4px', padding: 'var(--space-xs) var(--space-sm)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'inherit', color: 'inherit' }}>
+                  SKU Code <ArrowUpDown size={12} color={sortField === 'reference' ? 'var(--accent-main)' : 'var(--text-muted)'} />
+                </button>
+              </th>
+              <th style={{ padding: '0', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
+                <button type="button" onClick={() => handleSort('name')} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '4px', padding: 'var(--space-xs) var(--space-sm)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'inherit', color: 'inherit' }}>
+                  Product Name <ArrowUpDown size={12} color={sortField === 'name' ? 'var(--accent-main)' : 'var(--text-muted)'} />
+                </button>
+              </th>
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>Category</th>
-              <SortTh field="salesPrice" label="Sales Price" align="right" />
-              <SortTh field="costPrice" label="Cost Price" align="right" />
+              <th style={{ padding: '0', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
+                <button type="button" onClick={() => handleSort('salesPrice')} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', padding: 'var(--space-xs) var(--space-sm)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'inherit', color: 'inherit' }}>
+                  <ArrowUpDown size={12} color={sortField === 'salesPrice' ? 'var(--accent-main)' : 'var(--text-muted)'} /> Sales Price
+                </button>
+              </th>
+              <th style={{ padding: '0', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
+                <button type="button" onClick={() => handleSort('costPrice')} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', padding: 'var(--space-xs) var(--space-sm)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'inherit', color: 'inherit' }}>
+                  <ArrowUpDown size={12} color={sortField === 'costPrice' ? 'var(--accent-main)' : 'var(--text-muted)'} /> Cost Price
+                </button>
+              </th>
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', textAlign: 'right', whiteSpace: 'nowrap' }}>On Hand</th>
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', textAlign: 'right', whiteSpace: 'nowrap' }}>Reserved</th>
-              <SortTh field="available" label="Free to Use" align="right" />
+              <th style={{ padding: '0', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
+                <button type="button" onClick={() => handleSort('freeToUse')} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', padding: 'var(--space-xs) var(--space-sm)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'inherit', color: 'inherit' }}>
+                  <ArrowUpDown size={12} color={sortField === 'freeToUse' ? 'var(--accent-main)' : 'var(--text-muted)'} /> Free to Use
+                </button>
+              </th>
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', textAlign: 'right', whiteSpace: 'nowrap' }}>Reorder Pt.</th>
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>Procurement</th>
               <th style={{ padding: 'var(--space-xs) var(--space-sm)', fontWeight: 600, fontSize: 'var(--text-sm)', whiteSpace: 'nowrap' }}>Status</th>

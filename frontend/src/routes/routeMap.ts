@@ -37,9 +37,10 @@ export const ROUTES = {
   MANUFACTURING_KANBAN: '/app/manufacturing-orders/kanban',
 
   // Bill of Materials
-  BOM_LIST: '/app/bom',
-  BOM_DETAIL: '/app/bom/:id',
-  BOM_CREATE: '/app/bom/new',
+  BOM_LIST: '/bom',
+  BOM_DETAIL: '/bom/:id',
+  BOM_CREATE: '/bom/new',
+  BOM_EDIT: '/bom/:id/edit',
 
   // Partners
   VENDORS: '/app/vendors',

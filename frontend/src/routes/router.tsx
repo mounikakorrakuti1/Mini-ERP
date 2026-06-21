@@ -196,6 +196,14 @@ export const router = createBrowserRouter([
               </PermissionRoute>
             ),
           },
+          {
+            path: ':id/edit',
+            element: (
+              <PermissionRoute module={MODULE.BOM} action={PERMISSION_ACTION.ADMIN}>
+                <BomCreatePage />
+              </PermissionRoute>
+            ),
+          },
           { path: ':id', element: <BomDetailPage /> },
         ],
       },

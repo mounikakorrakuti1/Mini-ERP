@@ -43,12 +43,16 @@ export default function ProductDetailPage() {
   const canAdjustStock = hasPermission(user?.permissions, MODULE.INVENTORY, PERMISSION_ACTION.ADMIN);
 
   // ─── Handlers ────────────────────────────────────────────────────
-  const handleUpdate = (data: ProductFormData) => {
-    updateProduct(product.id, {
-      ...data,
-      freeToUse: product.onHand - product.reserved,
-    });
-    setIsEditing(false);
+  const handleUpdate = async (data: ProductFormData) => {
+    try {
+      await updateProduct(product.id, {
+        ...data,
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update product details. Please check your inputs.');
+    }
   };
 
   const handleStockAdjustment = (direction: 'IN' | 'OUT', quantity: number, reason: string) => {
@@ -59,7 +63,7 @@ export default function ProductDetailPage() {
   const productMovements = stockMovements.filter((m) => m.productId === product.id);
 
   // Reorder point stats
-  const isLowStock = product.freeToUse < product.reorderPoint;
+  const isLowStock = product.available < product.reorderPoint;
   const defaultVendor = vendors.find(v => v.id === product.defaultVendorId);
   const defaultBom = boms.find(b => b.id === product.defaultBomId);
 
@@ -144,7 +148,7 @@ export default function ProductDetailPage() {
               <div className="card" style={{ padding: 'var(--space-sm) var(--space-md)', backgroundColor: 'var(--bg-app)', borderLeft: `4px solid ${isLowStock ? 'var(--status-danger)' : 'var(--status-success)'}` }}>
                 <div className="text-xs">Free-to-Use</div>
                 <div className="h3" style={{ fontFamily: 'monospace', color: isLowStock ? 'var(--status-danger)' : 'var(--status-success)' }}>
-                  {product.freeToUse}
+                  {product.available}
                 </div>
               </div>
               <div className="card" style={{ padding: 'var(--space-sm) var(--space-md)', backgroundColor: 'var(--bg-app)', borderLeft: '4px solid var(--status-warning)' }}>

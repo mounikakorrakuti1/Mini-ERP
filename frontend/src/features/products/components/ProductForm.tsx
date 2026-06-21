@@ -47,14 +47,14 @@ export function ProductForm({ initialData, onSubmit, onCancel }: ProductFormProp
 
   // Adjust procurement choices based on category dynamically for helpful defaults
   useEffect(() => {
-    if (procureOnDemand) {
+    if (procureOnDemand && !initialData) {
       if (category === 'FINISHED_GOOD') {
         setProcurementType('MANUFACTURING');
       } else {
         setProcurementType('PURCHASE');
       }
     }
-  }, [category]);
+  }, [category, procureOnDemand, initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
