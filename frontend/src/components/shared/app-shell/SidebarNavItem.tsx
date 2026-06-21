@@ -10,7 +10,9 @@ interface SidebarNavItemProps {
 
 export function SidebarNavItem({ label, path, icon: Icon, collapsed }: SidebarNavItemProps) {
   const location = useLocation();
-  const isActive = location.pathname.startsWith(path) && (path !== '/' || location.pathname === '/');
+  const isActive = path === '/app' 
+    ? location.pathname === '/app' || location.pathname === '/app/'
+    : location.pathname.startsWith(path) && (path !== '/' || location.pathname === '/');
 
   return (
     <li className={`sidebar__nav-li ${isActive ? 'isActive' : ''}`}>
