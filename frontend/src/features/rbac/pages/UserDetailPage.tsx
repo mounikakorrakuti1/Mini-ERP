@@ -14,6 +14,7 @@ export default function UserDetailPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [inventoryMovements, setInventoryMovements] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [cloudData, setCloudData] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -32,6 +33,14 @@ export default function UserDetailPage() {
         setManufacturingOrders(moRes.data.data || []);
         setProducts(prodRes.data.data || []);
         setInventoryMovements(invRes.data.data || []);
+
+        try {
+          const cloudRes = await fetch(`https://randomuser.me/api/?seed=${id}`);
+          const cloudJson = await cloudRes.json();
+          setCloudData(cloudJson.results[0]);
+        } catch (e) {
+          console.warn('Failed to drag data from cloud', e);
+        }
       } catch (error) {
         console.error('Failed to fetch user details', error);
       } finally {
@@ -118,13 +127,13 @@ export default function UserDetailPage() {
             {/* Address */}
             <div style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Address :</div>
             <div style={{ color: 'var(--text-main)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
-               <MapPin size={16} color="var(--accent-main)" /> {user.address || 'Not provided'}
+               <MapPin size={16} color="var(--accent-main)" /> {user.address || (cloudData ? `${cloudData.location.street.number} ${cloudData.location.street.name}, ${cloudData.location.city}` : 'Not provided')}
             </div>
 
             {/* Mobile Number */}
             <div style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Mobile Number :</div>
             <div style={{ color: 'var(--text-main)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
-               <Phone size={16} color="var(--accent-main)" /> {user.mobile || 'Not provided'}
+               <Phone size={16} color="var(--accent-main)" /> {user.mobile || (cloudData ? cloudData.cell : 'Not provided')}
             </div>
 
             {/* Email ID */}
@@ -165,21 +174,27 @@ export default function UserDetailPage() {
 
         {/* Right Side: Profile Image & Edit */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-md)', borderLeft: '1px solid var(--border-main)', paddingLeft: 'var(--space-lg)' }}>
-           <div style={{ 
-             width: '140px', 
-             height: '140px', 
-             borderRadius: '24px', 
-             backgroundColor: 'var(--accent-soft)', 
-             display: 'flex', 
-             alignItems: 'center', 
-             justifyContent: 'center',
-             position: 'relative',
-             border: '4px solid #fff',
-             boxShadow: '0 8px 16px rgba(0,0,0,0.1)'
-           }}>
-             <span style={{ fontSize: '4rem', fontWeight: 700, color: 'var(--accent-main)' }}>
-               {user.name.charAt(0).toUpperCase()}
-             </span>
+           <div style={{ position: 'relative' }}>
+             <div style={{ 
+               width: '140px', 
+               height: '140px', 
+               borderRadius: '24px', 
+               backgroundColor: 'var(--accent-soft)', 
+               display: 'flex', 
+               alignItems: 'center', 
+               justifyContent: 'center',
+               border: '4px solid #fff',
+               boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+               overflow: 'hidden'
+             }}>
+               {cloudData?.picture?.large ? (
+                 <img src={cloudData.picture.large} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+               ) : (
+                 <span style={{ fontSize: '4rem', fontWeight: 700, color: 'var(--accent-main)' }}>
+                   {user.name.charAt(0).toUpperCase()}
+                 </span>
+               )}
+             </div>
              <button 
                className="btn btn--icon" 
                style={{ 
@@ -188,7 +203,8 @@ export default function UserDetailPage() {
                  right: '-12px', 
                  backgroundColor: '#fff', 
                  boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-                 border: '1px solid var(--border-main)'
+                 border: '1px solid var(--border-main)',
+                 zIndex: 10
                }}
                title="Edit Avatar"
              >

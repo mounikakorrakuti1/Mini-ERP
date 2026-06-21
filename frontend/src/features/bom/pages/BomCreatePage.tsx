@@ -105,7 +105,8 @@ export default function BomCreatePage() {
       await refreshData();
       navigate(ROUTES.BOM_LIST);
     } catch (error: any) {
-      alert(error.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'create'} BoM`);
+      const errMessage = error.response?.data?.error?.message || error.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'create'} BoM`;
+      alert(errMessage);
       setIsSubmitting(false);
     }
   };

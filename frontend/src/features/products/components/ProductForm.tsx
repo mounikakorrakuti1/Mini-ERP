@@ -263,7 +263,7 @@ export function ProductForm({ initialData, onSubmit, onCancel }: ProductFormProp
                   style={{ appearance: 'auto' }}
                 >
                   <option value="">-- Select BoM --</option>
-                  {boms.map(b => (
+                  {filteredBoms.map(b => (
                     <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
                   {/* Fallback if no specific BoM matches the finished product code */}

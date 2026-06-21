@@ -181,7 +181,7 @@ export default function UserManagementPage() {
                 style={{ borderBottom: '1px solid var(--border-main)', cursor: 'pointer' }} 
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-app)')} 
                 onMouseLeave={e => (e.currentTarget.style.background = '')}
-                onClick={() => navigate(`/admin/users/${user.id}`)}
+                onClick={() => navigate(`/app/admin/users/${user.id}`)}
               >
                 <td style={{ padding: 'var(--space-xs) var(--space-sm)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
