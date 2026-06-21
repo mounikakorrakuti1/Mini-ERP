@@ -806,6 +806,13 @@ app.patch(
   '/bom/:id',
   authenticate,
   requirePermission('BOM', 'ADMIN'),
+  body(z.object({
+    finishedProductId: id.optional(),
+    referenceQty: z.coerce.number().positive().optional(),
+    active: z.boolean().optional(),
+    items: z.array(z.object({ productId: id, quantity: z.coerce.number().positive() })).min(1).optional(),
+    operations: z.array(z.object({ name: z.string().trim().min(1), workCenter: z.string().optional().nullable(), expectedMinutes: z.coerce.number().positive() })).default([]).optional(),
+  })),
   asyncHandler(async (q, r) =>
     ok(
       r,
